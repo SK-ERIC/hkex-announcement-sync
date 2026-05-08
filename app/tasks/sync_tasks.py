@@ -26,7 +26,7 @@ def sync_announcements_task(
 
     settings = Settings()
     if stock_codes:
-        settings = settings.model_copy(update={"SYNC_STOCK_CODES": stock_codes})
+        settings = settings.model_copy(update={"SYNC_STOCK_CODES": ",".join(stock_codes) if stock_codes else settings.SYNC_STOCK_CODES})
 
     self.update_state(state="RUNNING", meta={"progress": {"total": 0, "synced": 0, "skipped": 0, "failed": 0}})
 

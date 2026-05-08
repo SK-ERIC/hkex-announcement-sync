@@ -23,13 +23,13 @@ class SyncService:
 
     def run(self, task_state: dict | None = None) -> dict[str, Any]:
         """Run sync. task_state is used to report progress to Celery."""
-        stock_codes = self._settings.SYNC_STOCK_CODES
+        stock_codes = self._settings.stock_codes
         total_synced = 0
         total_skipped = 0
         total_failed = 0
         errors: list[str] = []
 
-        with HKEXClient(self._settings) as client, PDFDownloader(self._storage, self._settings) as downloader:
+        with HKEXClient(self._settings, mock=self._settings.HKEX_MOCK) as client, PDFDownloader(self._storage, self._settings) as downloader:
             for stock_code in stock_codes:
                 try:
                     s, k, f, e = self._sync_stock(client, downloader, stock_code, task_state)
@@ -84,7 +84,8 @@ class SyncService:
         if last_sync:
             date_from = last_sync
         else:
-            date_from = date(2000, 1, 1)
+            # First run: start from 3 months ago to limit initial sync scope
+            date_from = date.today() - timedelta(days=90)
         date_to = date.today()
 
         # 3. Fetch metadata from HKEX
