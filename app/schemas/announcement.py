@@ -9,7 +9,7 @@ class AnnouncementResponse(BaseModel):
     stock_code: str
     stock_name: str
     title: str
-    announcement_date: date | None = None
+    announcement_date: datetime | None = None
     filing_type: str | None = None
     hkex_url: str
     file_path: str | None = None
