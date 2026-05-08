@@ -6,18 +6,89 @@ A standalone backend data synchronization service that automatically fetches all
 
 ## Features
 
+- **Zero-Config Local Dev** — SQLite by default, no external services required to get started
+- **Redis Optional** — Sync tasks run in-process when Redis is not available; delegate to Celery when it is
+- **Mock Mode** — Use local test data instead of hitting the real HKEX API (`HKEX_MOCK=true`)
 - **Stock Code Based Sync** — Configure one or more HK stock codes (e.g., `00700`, `09988`) to fetch all published announcement metadata from HKEXnews
-- **Full & Incremental Sync** — First-run pulls full history (from listing date to present); subsequent runs only fetch new announcements since the last sync
+- **Full & Incremental Sync** — First-run pulls recent 90 days; subsequent runs only fetch new announcements since the last sync
 - **Concurrent PDF Download** — Download announcement PDFs with configurable concurrency (default: 5 workers), with retry on failure
 - **Deduplication** — Automatically skip already-synced announcements based on unique URL identifiers
-- **Database Persistence** — Store all announcement metadata in MySQL or PostgreSQL via SQLAlchemy ORM
+- **Database Persistence** — Store all announcement metadata in SQLite, MySQL, or PostgreSQL via SQLAlchemy ORM
 - **Scheduled Auto Sync** — Hourly incremental sync via Celery Beat (configurable schedule)
 - **Manual Trigger API** — `POST /api/sync` to trigger on-demand sync with optional stock codes and date range
 - **Task Status Tracking** — Poll `GET /api/sync/status/{task_id}` for real-time sync progress
 - **REST API** — Paginated list, detail, and PDF download endpoints for website backend integration
-- **Dual Database Support** — MySQL (asyncmy) and PostgreSQL (asyncpg), switchable via config
+- **Triple Database Support** — SQLite (default), MySQL, and PostgreSQL, switchable via config
 - **Dual Storage Support** — Local filesystem or S3-compatible storage (Aliyun OSS, MinIO, AWS S3, etc.)
 - **Docker Compose Deployment** — One command to start API, Celery worker, Celery beat, MySQL, and Redis
+
+## Quick Start
+
+### Prerequisites
+
+- [Python 3.12+](https://www.python.org/) (managed via [mise](https://mise.jdx.dev/) or system)
+- [uv](https://docs.astral.sh/uv/) package manager
+- [Docker](https://www.docker.com/) & Docker Compose (optional, for production deployment)
+
+### Option 1: Local Development (Zero Config)
+
+No MySQL, Redis, or external services needed. Just Python.
+
+```bash
+# Install dependencies
+uv sync
+
+# Copy and edit configuration (defaults work out of the box)
+cp .env.example .env
+
+# Start API server — SQLite database is auto-created
+uvicorn app.main:app --reload
+```
+
+Visit `http://localhost:8000/docs` for the interactive Swagger API documentation.
+
+**To use mock data instead of real HKEX API** (avoids hitting the real API during development):
+
+```bash
+# In .env, set:
+HKEX_MOCK=true
+```
+
+**Trigger your first sync:**
+
+```bash
+curl -X POST http://localhost:8000/api/sync \
+  -H "Content-Type: application/json" \
+  -d '{"stock_codes": ["00700"], "mode": "incremental"}'
+```
+
+### Option 2: Docker Compose (Production)
+
+```bash
+# Clone the repository
+git clone https://github.com/YOUR_USERNAME/hkex-announcement-sync.git
+cd hkex-announcement-sync
+
+# Copy and edit configuration
+cp .env.example .env
+# Edit .env: set DATABASE_URL, CELERY_ENABLED=true, stock codes, etc.
+
+# Start all services
+docker compose up -d
+
+# Run database migrations (MySQL/PostgreSQL only)
+docker compose exec api alembic upgrade head
+```
+
+This starts 5 services:
+
+| Service   | Description                          | Port      |
+|-----------|--------------------------------------|-----------|
+| `api`     | FastAPI application (uvicorn)        | `8000`    |
+| `worker`  | Celery worker (sync task execution)  | —         |
+| `beat`    | Celery beat (scheduled sync trigger) | —         |
+| `db`      | MySQL 8.0                            | `3306`    |
+| `redis`   | Redis 7 (message broker)             | `6379`    |
 
 ## Architecture
 
@@ -28,18 +99,23 @@ A standalone backend data synchronization service that automatically fetches all
 └──────────────┬─────────────────────────────┬─────────────┘
                │                             │
        ┌───────▼───────┐            ┌────────▼────────┐
-       │  Celery Worker │            │  Query Service   │
-       │  (sync tasks)  │            │  (CRUD + list)   │
-       └───────┬───────┘            └────────┬─────────┘
-               │                             │
-    ┌──────────▼──────────┐        ┌─────────▼──────────┐
-    │    Sync Service      │        │    SQLAlchemy      │
-    │  ┌───────────────┐  │        │    (Async ORM)     │
-    │  │ HKEX Client   │  │        └─────────┬──────────┘
-    │  │ (scrape API)  │  │                  │
-    │  └───────┬───────┘  │        ┌─────────▼──────────┐
-    │  ┌───────▼───────┐  │        │  MySQL / PostgreSQL │
-    │  │ PDF Downloader│  │        └────────────────────┘
+       │  Sync Service  │            │  Query Service   │
+       │                │            │  (CRUD + list)   │
+       │  Celery mode:  │            └────────┬─────────┘
+       │  delegate to   │                     │
+       │  worker        │            ┌─────────▼──────────┐
+       │                │            │    SQLAlchemy      │
+       │  Inline mode:  │            │    (Async ORM)     │
+       │  run directly  │            └─────────┬──────────┘
+       └───────┬───────┘                      │
+               │                     ┌─────────▼──────────┐
+    ┌──────────▼──────────┐          │ SQLite / MySQL /    │
+    │  ┌───────────────┐  │          │ PostgreSQL          │
+    │  │ HKEX Client   │  │          └────────────────────┘
+    │  │ (JSF session) │  │
+    │  └───────┬───────┘  │
+    │  ┌───────▼───────┐  │
+    │  │ PDF Downloader│  │
     │  │ (concurrent)  │  │
     │  └───────┬───────┘  │
     │  ┌───────▼───────┐  │
@@ -47,12 +123,14 @@ A standalone backend data synchronization service that automatically fetches all
     │  │ Local / S3    │  │
     │  └───────────────┘  │
     └─────────────────────┘
-               │
-       ┌───────▼───────┐
-       │ Celery Beat    │
-       │ (hourly sync)  │
-       └───────────────┘
 ```
+
+**Two sync modes:**
+
+| Mode | When | How |
+|------|------|-----|
+| **Inline** | `CELERY_ENABLED=false` (default) | Sync runs directly in the API process |
+| **Celery** | `CELERY_ENABLED=true` | Sync is dispatched to Celery worker via Redis |
 
 ## Project Structure
 
@@ -81,7 +159,7 @@ hkex-announcement-sync/
 │   │   └── announcement_service.py # Announcement CRUD operations
 │   ├── scraper/
 │   │   ├── __init__.py
-│   │   ├── hkex_client.py          # HKEX API client (search + parse)
+│   │   ├── hkex_client.py          # HKEX API client (JSF session + JSON)
 │   │   └── pdf_downloader.py       # Concurrent PDF downloader
 │   ├── storage/
 │   │   ├── __init__.py
@@ -96,6 +174,8 @@ hkex-announcement-sync/
 │   └── utils/
 │       ├── __init__.py
 │       └── logging.py              # Logging setup
+├── tests/
+│   └── mock_hkex_response.json     # Mock data for HKEX_MOCK mode
 ├── migrations/                     # Alembic migration scripts
 ├── docker-compose.yml
 ├── Dockerfile
@@ -104,69 +184,6 @@ hkex-announcement-sync/
 ├── .env.example
 └── .mise.toml                      # mise Python version config
 ```
-
-## Quick Start
-
-### Prerequisites
-
-- [Python 3.12+](https://www.python.org/) (managed via [mise](https://mise.jdx.dev/) or system)
-- [uv](https://docs.astral.sh/uv/) package manager
-- [Docker](https://www.docker.com/) & Docker Compose (for containerized deployment)
-
-### Option 1: Docker Compose (Recommended)
-
-```bash
-# Clone the repository
-git clone https://github.com/YOUR_USERNAME/hkex-announcement-sync.git
-cd hkex-announcement-sync
-
-# Copy and edit configuration
-cp .env.example .env
-# Edit .env to set SYNC_STOCK_CODES, DATABASE_URL, etc.
-
-# Start all services
-docker compose up -d
-
-# Run database migrations
-docker compose exec api alembic upgrade head
-```
-
-This starts 5 services:
-
-| Service   | Description                          | Port      |
-|-----------|--------------------------------------|-----------|
-| `api`     | FastAPI application (uvicorn)        | `8000`    |
-| `worker`  | Celery worker (sync task execution)  | —         |
-| `beat`    | Celery beat (scheduled sync trigger) | —         |
-| `db`      | MySQL 8.0                            | `3306`    |
-| `redis`   | Redis 7 (message broker)             | `6379`    |
-
-### Option 2: Local Development
-
-```bash
-# Install Python version (if using mise)
-mise install
-
-# Install dependencies
-uv sync
-
-# Copy and edit configuration
-cp .env.example .env
-
-# Ensure MySQL and Redis are running locally, then run migrations
-alembic upgrade head
-
-# Start API server
-uvicorn app.main:app --reload
-
-# Start Celery worker (in another terminal)
-celery -A app.tasks.celery_app:celery_app worker --loglevel=info
-
-# Start Celery beat scheduler (in another terminal)
-celery -A app.tasks.celery_app:celery_app beat --loglevel=info
-```
-
-After starting, visit `http://localhost:8000/docs` for the interactive Swagger API documentation.
 
 ## API Reference
 
@@ -256,13 +273,11 @@ curl "http://localhost:8000/api/announcements?stock_code=00700&page=1&page_size=
       "stock_code": "00700",
       "stock_name": "TENCENT HOLDINGS LTD",
       "title": "MONTHLY RETURN OF EQUITY ISSUER...",
-      "announcement_date": "2026-04-30",
+      "announcement_date": "2026-04-30T17:00:00",
       "filing_type": "Monthly Return",
       "hkex_url": "https://www1.hkexnews.hk/listedco/...",
-      "file_path": "/app/data/pdfs/00700/550e8400....pdf",
       "file_size": 102400,
       "source": "auto",
-      "is_visible": true,
       "download_url": "/api/announcements/550e8400.../download",
       "created_at": "2026-05-01T10:00:00",
       "updated_at": "2026-05-01T10:00:00"
@@ -312,7 +327,7 @@ Returns the PDF file as a download stream with `Content-Disposition` header.
 | `stock_code`        | VARCHAR(10)   | Stock code (e.g., "00700")                      |
 | `stock_name`        | VARCHAR(100)  | Company name                                    |
 | `title`             | TEXT          | Announcement title                              |
-| `announcement_date` | DATETIME      | Publication date                                |
+| `announcement_date` | DATETIME      | Publication date and time                       |
 | `filing_type`       | VARCHAR(50)   | Announcement category (optional)                |
 | `hkex_url`          | TEXT          | Original HKEX link                              |
 | `file_path`         | TEXT          | Local or S3 storage path                        |
@@ -332,21 +347,36 @@ All settings are configured via environment variables or a `.env` file. Copy `.e
 
 ### Database
 
-| Variable       | Default                                          | Description                                      |
-|----------------|--------------------------------------------------|--------------------------------------------------|
-| `DATABASE_URL` | `mysql+asyncmy://root:root@localhost:3306/hkex_sync` | SQLAlchemy async connection string              |
+| Variable       | Default                                    | Description                        |
+|----------------|--------------------------------------------|------------------------------------|
+| `DATABASE_URL` | `sqlite+aiosqlite:///./data/hkex_sync.db` | SQLAlchemy async connection string |
 
-**MySQL example:**
+**SQLite** (default, zero-config):
+
+```
+DATABASE_URL=sqlite+aiosqlite:///./data/hkex_sync.db
+```
+
+**MySQL** (for production):
 
 ```
 DATABASE_URL=mysql+asyncmy://user:password@localhost:3306/hkex_sync
 ```
 
-**PostgreSQL example:**
+**PostgreSQL** (for production):
 
 ```
 DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/hkex_sync
 ```
+
+### Task Queue
+
+| Variable             | Default  | Description                                                     |
+|----------------------|----------|-----------------------------------------------------------------|
+| `CELERY_ENABLED`     | `false`  | When `false`, sync runs in-process. When `true`, uses Celery.   |
+| `REDIS_URL`          | see .env | Redis connection URL (only needed when `CELERY_ENABLED=true`)   |
+| `CELERY_BROKER_URL`  | see .env | Celery broker URL (only needed when `CELERY_ENABLED=true`)      |
+| `CELERY_RESULT_BACKEND` | see .env | Celery result backend URL (only needed when `CELERY_ENABLED=true`) |
 
 ### Storage
 
@@ -368,13 +398,11 @@ DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/hkex_sync
 | `SYNC_CONCURRENCY`   | `5`        | Number of concurrent PDF download workers             |
 | `SYNC_CRON_SCHEDULE` | `0 * * * *`| Celery Beat cron schedule (default: every hour)       |
 
-### Celery / Redis
+### HKEX API
 
-| Variable                 | Default                           | Description                    |
-|--------------------------|-----------------------------------|--------------------------------|
-| `REDIS_URL`              | `redis://localhost:6379/0`        | Redis connection URL           |
-| `CELERY_BROKER_URL`      | `redis://localhost:6379/1`        | Celery broker URL              |
-| `CELERY_RESULT_BACKEND`  | `redis://localhost:6379/2`        | Celery result backend URL      |
+| Variable     | Default  | Description                                              |
+|--------------|----------|----------------------------------------------------------|
+| `HKEX_MOCK`  | `false`  | When `true`, use local test data instead of real API     |
 
 ### HTTP Client
 
@@ -384,21 +412,21 @@ DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/hkex_sync
 | `HTTP_MAX_RETRIES`   | `3`     | Maximum retry attempts per request       |
 | `HTTP_RETRY_BACKOFF` | `1.0`   | Exponential backoff multiplier (seconds) |
 
-### API
-
-| Variable            | Default | Description                     |
-|---------------------|---------|---------------------------------|
-| `API_PREFIX`        | `/api`  | API route prefix                |
-| `PAGE_SIZE_DEFAULT` | `20`    | Default pagination page size    |
-| `PAGE_SIZE_MAX`     | `100`   | Maximum pagination page size    |
-
 ## How Sync Works
+
+### HKEX API Flow
+
+The HKEX search API requires a JSF session-based approach:
+
+1. **GET** search page with parameters — extracts `ViewState` and JSF form `action` URL (contains `jsessionid`)
+2. **POST** the form action URL with `ViewState` + date range — initializes the server-side search session
+3. **GET** the JSON API with pagination (`rowRange`) — fetches announcement records
 
 ### Full Sync (First Run)
 
 1. Resolve each stock code to an HKEX internal stock ID via `prefix.do` API
-2. Query announcements from `2000-01-01` to today, chunked by month (HKEX API limits queries to ~1 month)
-3. Each month chunk is paginated (5000 records per page) until all results are fetched
+2. Query announcements from the last 90 days to today, chunked by month
+3. Each month chunk is paginated (up to 5000 records per page) until all results are fetched
 4. Parse raw JSON records into normalized announcement data
 5. Deduplicate against existing database records (by `stock_code` + `hkex_url`)
 6. Insert new announcement metadata into the database
@@ -411,7 +439,25 @@ Same as full sync, but the date range starts from the most recent `announcement_
 
 ### Scheduled Sync
 
-Celery Beat triggers `scheduled_incremental_sync` every hour by default. This calls the same sync pipeline in incremental mode for all configured stock codes.
+When `CELERY_ENABLED=true`, Celery Beat triggers `scheduled_incremental_sync` every hour by default.
+
+## Dependencies
+
+Core dependencies (installed by default):
+
+```
+fastapi, uvicorn, sqlalchemy, alembic, aiosqlite, pydantic, httpx, tenacity
+```
+
+Optional dependency groups:
+
+| Group       | Install                       | Includes               |
+|-------------|-------------------------------|------------------------|
+| MySQL       | `uv sync --extra mysql`       | asyncmy                |
+| PostgreSQL  | `uv sync --extra postgres`    | asyncpg                |
+| Celery      | `uv sync --extra celery`      | celery, redis          |
+| S3          | `uv sync --extra s3`          | boto3                  |
+| All         | `uv sync --extra all`         | all of the above       |
 
 ## Development
 
@@ -434,7 +480,7 @@ uv run ruff format app/
 # Generate a new migration after model changes
 alembic revision --autogenerate -m "description"
 
-# Apply migrations
+# Apply migrations (MySQL/PostgreSQL only; SQLite auto-creates tables)
 alembic upgrade head
 
 # Rollback one migration
