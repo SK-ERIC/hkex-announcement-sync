@@ -9,6 +9,12 @@ from app.utils.logging import setup_logging
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_logging()
+
+    # Auto-create SQLite tables on startup (dev mode)
+    from app.database import init_db
+
+    await init_db()
+
     yield
 
 
