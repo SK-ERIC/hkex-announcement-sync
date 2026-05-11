@@ -82,7 +82,8 @@ class SyncService:
         # 2. Determine date range
         last_sync = await announcement_service.get_last_sync_date(self._db, stock_code)
         if last_sync:
-            date_from = last_sync
+            # DB stores datetime, convert to date for HKEX API
+            date_from = last_sync.date() if hasattr(last_sync, "date") else last_sync
         else:
             # First run: start from 3 months ago to limit initial sync scope
             date_from = date.today() - timedelta(days=90)
