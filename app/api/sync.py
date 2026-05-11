@@ -22,7 +22,15 @@ async def _run_sync_inline(
     stock_codes: list[str] | None,
     mode: str,
 ) -> None:
-    """Execute sync directly in-process (no Celery/Redis required)."""
+    """Execute sync directly in-process without Celery or Redis.
+
+    在进程内直接执行同步，无需 Celery 或 Redis。
+
+    Args:
+        task_id: Unique task identifier for tracking. / 用于跟踪的唯一任务标识符。
+        stock_codes: Optional list of stock codes to sync. / 可选的要同步的股票代码列表。
+        mode: Sync mode string (e.g. 'full', 'incremental'). / 同步模式字符串。
+    """
     from app.config import Settings
     from app.database import async_session_factory
     from app.services.sync_service import SyncService
@@ -53,10 +61,23 @@ async def _run_sync_inline(
 
 @router.post("", response_model=dict)
 async def trigger_sync(request: SyncRequest):
-    """Trigger a sync task.
+    """Trigger a sync task via Celery or inline execution.
+
+    触发同步任务，通过 Celery 或内联执行。
 
     Uses Celery when CELERY_ENABLED=true and Redis is available.
-    Otherwise runs sync directly in-process.
+    Otherwise runs sync directly in-process as an asyncio background task.
+
+    当 CELERY_ENABLED=true 且 Redis 可用时使用 Celery。
+    否则作为 asyncio 后台任务在进程内直接运行同步。
+
+    Args:
+        request: Sync request body with stock_codes, mode, and date range.
+                 包含 stock_codes、mode 和日期范围的同步请求体。
+
+    Returns:
+        dict: {"task_id": str} for tracking the sync task status.
+              {"task_id": str} 用于跟踪同步任务状态。
     """
     settings = get_settings()
 
@@ -92,7 +113,24 @@ async def trigger_sync(request: SyncRequest):
 
 @router.get("/status/{task_id}", response_model=SyncStatusResponse)
 async def get_sync_status(task_id: str):
-    """Query the status of a sync task."""
+    """Query the current status of a sync task by its task ID.
+
+    通过任务 ID 查询同步任务的当前状态。
+
+    Checks Celery result backend when Celery is enabled,
+    otherwise looks up the in-memory task store.
+
+    当 Celery 启用时查询 Celery 结果后端，
+    否则查询内存中的任务存储。
+
+    Args:
+        task_id: The unique task identifier returned by trigger_sync.
+                 由 trigger_sync 返回的唯一任务标识符。
+
+    Returns:
+        SyncStatusResponse: Current task status with progress details and any errors.
+                            包含进度详情和错误信息的当前任务状态。
+    """
     settings = get_settings()
 
     if settings.CELERY_ENABLED:
