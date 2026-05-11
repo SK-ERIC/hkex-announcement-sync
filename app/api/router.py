@@ -1,3 +1,9 @@
+"""
+API router aggregation module for all sub-routers.
+
+所有子路由的聚合模块。
+"""
+
 from fastapi import APIRouter
 
 from app.api.announcements import router as announcements_router

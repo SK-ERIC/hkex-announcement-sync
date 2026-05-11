@@ -1,3 +1,9 @@
+"""
+Concurrent PDF downloader with retry support.
+
+支持重试的并发 PDF 下载器。
+"""
+
 import hashlib
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -14,6 +20,12 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class DownloadResult:
+    """
+        Result of a single PDF download attempt.
+
+    单次 PDF 下载尝试的结果。
+    """
+
     key: str
     file_path: str | None = None
     file_size: int = 0
@@ -23,9 +35,16 @@ class DownloadResult:
 
 
 class PDFDownloader:
-    """Concurrent PDF downloader with retry support."""
+    """
+    Concurrent PDF downloader with retry support.
+    """
 
     def __init__(self, storage: StorageBackend, settings: Settings | None = None):
+        """
+            Initialize the downloader with a storage backend and optional settings.
+
+        使用存储后端和可选配置初始化下载器。
+        """
         self._storage = storage
         self._settings = settings or Settings()
         self._http = httpx.Client(
@@ -37,12 +56,27 @@ class PDFDownloader:
         )
 
     def close(self):
+        """
+            Close the HTTP client and release resources.
+
+        关闭 HTTP 客户端并释放资源。
+        """
         self._http.close()
 
     def __enter__(self):
+        """
+            Enter context manager, returning self.
+
+        进入上下文管理器，返回自身。
+        """
         return self
 
     def __exit__(self, *args):
+        """
+            Exit context manager, closing the HTTP client.
+
+        退出上下文管理器，关闭 HTTP 客户端。
+        """
         self.close()
 
     @retry(
@@ -56,7 +90,9 @@ class PDFDownloader:
         return resp.content
 
     def download_single(self, url: str, storage_key: str) -> DownloadResult:
-        """Download a single PDF and store it."""
+        """
+        Download a single PDF and store it.
+        """
         try:
             data = self._download_bytes(url)
             file_hash = hashlib.md5(data).hexdigest()
@@ -76,10 +112,12 @@ class PDFDownloader:
         self,
         tasks: list[tuple[str, str]],
     ) -> list[DownloadResult]:
-        """Download multiple PDFs concurrently.
+        """
+            Download multiple PDFs concurrently.
 
         Args:
             tasks: List of (url, storage_key) tuples.
+
         """
         results: list[DownloadResult] = []
         concurrency = self._settings.SYNC_CONCURRENCY

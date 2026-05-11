@@ -1,3 +1,9 @@
+"""
+API endpoints for HKEX bulletin queries with HKEX-compatible format.
+
+港交所公告查询 API 端点，兼容港交所响应格式。
+"""
+
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query
@@ -27,7 +33,8 @@ async def list_bulletins(
     sortorder: SortOrderEnum = Query(SortOrderEnum.desc),
     db: AsyncSession = Depends(get_db),
 ):
-    """Query HKEX bulletins with language support and HKEX-compatible response format.
+    """
+        Query HKEX bulletins with language support and HKEX-compatible response format.
 
     查询港交所公告，支持多语言和港交所兼容的响应格式。
 
@@ -43,6 +50,7 @@ async def list_bulletins(
     Returns:
         BulletinListResponse: HKEX-compatible bulletin list with status metadata.
                               港交所兼容的公告列表及状态元数据。
+
     """
     symbols = [s.strip() for s in symbol.split(",") if s.strip()]
 

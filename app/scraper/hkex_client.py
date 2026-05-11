@@ -1,3 +1,9 @@
+"""
+HKEX disclosure platform scraper client.
+
+港交所披露平台数据抓取客户端。
+"""
+
 import json
 import logging
 import re
@@ -17,7 +23,8 @@ HKEX_API_ENDPOINT = "https://www1.hkexnews.hk/search/titleSearchServlet.do"
 
 
 class HKEXClient:
-    """Client for fetching announcement data from the HKEX disclosure platform.
+    """
+        Client for fetching announcement data from the HKEX disclosure platform.
 
     从港交所披露平台获取公告数据的客户端。
 
@@ -37,19 +44,22 @@ class HKEXClient:
     """
 
     def __init__(self, settings: Settings | None = None):
-        """Initialize the HKEX client with optional settings.
+        """
+            Initialize the HKEX client with optional settings.
 
         使用可选的配置初始化港交所客户端。
 
         Args:
             settings: Application settings instance. Uses default Settings if None.
                       应用配置实例。为 None 时使用默认配置。
+
         """
         self._settings = settings or Settings()
         self._session: httpx.Client | None = None
 
     def close(self):
-        """Close the underlying HTTP session and release resources.
+        """
+            Close the underlying HTTP session and release resources.
 
         关闭底层 HTTP 会话并释放资源。
         """
@@ -57,27 +67,31 @@ class HKEXClient:
             self._session.close()
 
     def __enter__(self):
-        """Enter context manager, returning self.
+        """
+            Enter context manager, returning self.
 
         进入上下文管理器，返回自身。
         """
         return self
 
     def __exit__(self, *args):
-        """Exit context manager, closing the HTTP session.
+        """
+            Exit context manager, closing the HTTP session.
 
         退出上下文管理器，关闭 HTTP 会话。
         """
         self.close()
 
     def _get_session(self) -> httpx.Client:
-        """Get or create the shared HTTP client session (lazy initialization).
+        """
+            Get or create the shared HTTP client session (lazy initialization).
 
         获取或创建共享的 HTTP 客户端会话（延迟初始化）。
 
         Returns:
             httpx.Client: The configured HTTP client session.
                           已配置的 HTTP 客户端会话。
+
         """
         if self._session is None:
             self._session = httpx.Client(
@@ -90,7 +104,8 @@ class HKEXClient:
         return self._session
 
     def get_stock_id(self, stock_code: str) -> str:
-        """Resolve a stock code (e.g. '00700') to its HKEX internal stock ID.
+        """
+            Resolve a stock code (e.g. '00700') to its HKEX internal stock ID.
 
         将股票代码（如 '00700'）解析为港交所内部股票 ID。
 
@@ -105,6 +120,7 @@ class HKEXClient:
         Raises:
             ValueError: If the stock code cannot be resolved.
                         当股票代码无法解析时抛出。
+
         """
         params = {
             "callback": "callback",
@@ -137,7 +153,8 @@ class HKEXClient:
         date_to: date,
         stock_code: str = "",
     ) -> list[dict[str, Any]]:
-        """Fetch announcements in EN and ZH, then generate SC fields, merging by DATE_TIME.
+        """
+            Fetch announcements in EN and ZH, then generate SC fields, merging by DATE_TIME.
 
         获取英文和繁体中文公告，然后生成简体中文字段，按日期时间合并。
 
@@ -150,6 +167,7 @@ class HKEXClient:
         Returns:
             list[dict[str, Any]]: Merged trilingual announcement records.
                                   合并后的三语公告记录列表。
+
         """
         # Fetch EN records
         logger.info("Fetching EN announcements for stock_id=%s", stock_id)
@@ -212,7 +230,8 @@ class HKEXClient:
         date_to: date,
         lang: str = "E",
     ) -> list[dict[str, Any]]:
-        """Fetch all announcements for a stock within a date range, chunked by month.
+        """
+            Fetch all announcements for a stock within a date range, chunked by month.
 
         按月分块获取指定股票在日期范围内的所有公告。
 
@@ -226,6 +245,7 @@ class HKEXClient:
         Returns:
             list[dict[str, Any]]: All raw announcement records from HKEX.
                                   来自港交所的所有原始公告记录。
+
         """
         all_records: list[dict[str, Any]] = []
 
@@ -261,7 +281,8 @@ class HKEXClient:
         date_to: date,
         lang: str = "E",
     ) -> list[dict[str, Any]]:
-        """Fetch one month chunk of announcements using the JSF session-based approach.
+        """
+            Fetch one month chunk of announcements using the JSF session-based approach.
 
         使用基于 JSF 会话的方式获取一个月内的公告数据。
 
@@ -282,6 +303,7 @@ class HKEXClient:
         Returns:
             list[dict[str, Any]]: Raw announcement records for the chunk.
                                   该分块的原始公告记录。
+
         """
         session = self._get_session()
         from_str = date_from.strftime("%Y%m%d")
@@ -388,7 +410,8 @@ class HKEXClient:
 
     @staticmethod
     def _parse_single_record(raw: dict[str, Any], stock_code: str) -> dict[str, Any]:
-        """Parse a single raw HKEX API record into a normalized dictionary.
+        """
+            Parse a single raw HKEX API record into a normalized dictionary.
 
         将单条港交所 API 原始记录解析为标准化字典。
 
@@ -403,6 +426,7 @@ class HKEXClient:
             title, announcement_date, filing_type, short_text, long_text,
             hkex_url, file_link, file_type, news_id.
             标准化后的记录字典。
+
         """
         if not raw:
             return {
@@ -456,7 +480,8 @@ class HKEXClient:
 
     @staticmethod
     def _fill_sc_fields(records: list[dict[str, Any]]) -> None:
-        """Fill Simplified Chinese (SC/CN) fields by converting from Traditional Chinese using opencc.
+        """
+            Fill Simplified Chinese (SC/CN) fields by converting from Traditional Chinese using opencc.
 
         使用 opencc 将繁体中文字段转换为简体中文字段。
 
@@ -473,6 +498,7 @@ class HKEXClient:
         Note:
             If opencc is not installed, SC fields will be set to empty strings.
             如未安装 opencc，简体中文字段将被设为空字符串。
+
         """
         try:
             import opencc

@@ -1,3 +1,9 @@
+"""
+Pydantic schemas for announcement API request/response models.
+
+公告 API 请求/响应模型的 Pydantic 模式。
+"""
+
 from datetime import date, datetime
 from enum import Enum
 from uuid import UUID
@@ -6,7 +12,8 @@ from pydantic import BaseModel, Field
 
 
 class LanguageEnum(str, Enum):
-    """Supported language codes for announcement queries.
+    """
+        Supported language codes for announcement queries.
 
     公告查询支持的语言代码枚举。
 
@@ -14,6 +21,7 @@ class LanguageEnum(str, Enum):
         en: English / 英文
         zh: Traditional Chinese / 繁体中文
         cn: Simplified Chinese / 简体中文
+
     """
 
     en = "en"
@@ -22,13 +30,15 @@ class LanguageEnum(str, Enum):
 
 
 class SortOrderEnum(str, Enum):
-    """Sort order for query results.
+    """
+        Sort order for query results.
 
     查询结果的排序方向枚举。
 
     Attributes:
         desc: Descending order / 降序
         asc: Ascending order / 升序
+
     """
 
     desc = "desc"
@@ -39,7 +49,8 @@ class SortOrderEnum(str, Enum):
 
 
 class AnnouncementResponse(BaseModel):
-    """Pydantic schema for a single announcement in API responses.
+    """
+        Pydantic schema for a single announcement in API responses.
 
     API 响应中单条公告的 Pydantic 模式。
 
@@ -69,7 +80,8 @@ class AnnouncementResponse(BaseModel):
 
 
 class AnnouncementListResponse(BaseModel):
-    """Paginated list response wrapping multiple announcement items.
+    """
+        Paginated list response wrapping multiple announcement items.
 
     包含多条公告的分页列表响应模式。
     """
@@ -81,7 +93,8 @@ class AnnouncementListResponse(BaseModel):
 
 
 class AnnouncementDetailResponse(AnnouncementResponse):
-    """Extended announcement response with additional file metadata fields.
+    """
+        Extended announcement response with additional file metadata fields.
 
     包含额外文件元数据字段的扩展公告响应模式。
     """
@@ -91,7 +104,8 @@ class AnnouncementDetailResponse(AnnouncementResponse):
 
 
 class AnnouncementListParams(BaseModel):
-    """Query parameters for filtering and paginating announcement list requests.
+    """
+        Query parameters for filtering and paginating announcement list requests.
 
     用于过滤和分页公告列表请求的查询参数模式。
     """
@@ -108,7 +122,8 @@ class AnnouncementListParams(BaseModel):
 
 
 class DataStatus(BaseModel):
-    """Status metadata for bulletin API responses.
+    """
+        Status metadata for bulletin API responses.
 
     公告 API 响应的状态元数据模式。
     """
@@ -120,7 +135,8 @@ class DataStatus(BaseModel):
 
 
 class BulletinData(BaseModel):
-    """Schema for a single bulletin entry in HKEX-compatible format.
+    """
+        Schema for a single bulletin entry in HKEX-compatible format.
 
     港交所兼容格式的单条公告数据模式。
     """
@@ -138,7 +154,8 @@ class BulletinData(BaseModel):
 
 
 class BulletinListResponse(BaseModel):
-    """Response schema for the bulletin API wrapping status and data list.
+    """
+        Response schema for the bulletin API wrapping status and data list.
 
     公告 API 的响应模式，包含状态和数据列表。
     """
@@ -148,7 +165,8 @@ class BulletinListResponse(BaseModel):
 
 
 class BulletinQueryParams(BaseModel):
-    """Query parameters for the bulletin API with pagination, language, and sorting.
+    """
+        Query parameters for the bulletin API with pagination, language, and sorting.
 
     公告 API 的查询参数，包含分页、语言和排序选项。
     """

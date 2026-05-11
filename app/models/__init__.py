@@ -1,3 +1,9 @@
+"""
+SQLAlchemy ORM models for HKEX announcement data.
+
+港交所公告数据的 SQLAlchemy ORM 模型。
+"""
+
 import uuid
 from datetime import datetime
 from enum import Enum as PyEnum
@@ -8,7 +14,8 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
-    """SQLAlchemy declarative base class for all ORM models.
+    """
+        SQLAlchemy declarative base class for all ORM models.
 
     所有 ORM 模型的 SQLAlchemy 声明式基类。
     """
@@ -17,13 +24,15 @@ class Base(DeclarativeBase):
 
 
 class SourceType(str, PyEnum):
-    """Enumeration of announcement data source types.
+    """
+        Enumeration of announcement data source types.
 
     公告数据来源类型的枚举。
 
     Attributes:
         AUTO: Automatically synced from HKEX. / 从港交所自动同步。
         MANUAL: Manually entered by user. / 用户手动录入。
+
     """
 
     AUTO = "auto"
@@ -31,7 +40,8 @@ class SourceType(str, PyEnum):
 
 
 class Announcement(Base):
-    """ORM model representing an HKEX announcement with multilingual fields.
+    """
+        ORM model representing an HKEX announcement with multilingual fields.
 
     港交所公告的 ORM 模型，包含多语言字段。
 
@@ -61,6 +71,7 @@ class Announcement(Base):
         last_synced_at: Timestamp of last sync. / 上次同步时间戳。
         created_at: Record creation timestamp. / 记录创建时间戳。
         updated_at: Record update timestamp. / 记录更新时间戳。
+
     """
 
     __tablename__ = "announcements"

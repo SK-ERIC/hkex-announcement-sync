@@ -1,3 +1,9 @@
+"""
+API endpoints for triggering and monitoring sync tasks.
+
+触发和监控同步任务的 API 端点。
+"""
+
 import asyncio
 import logging
 import uuid
@@ -20,7 +26,8 @@ async def _run_sync_inline(
     stock_codes: list[str] | None,
     mode: str,
 ) -> None:
-    """Execute sync directly in-process without Celery or Redis.
+    """
+        Execute sync directly in-process without Celery or Redis.
 
     在进程内直接执行同步，无需 Celery 或 Redis。
 
@@ -28,6 +35,7 @@ async def _run_sync_inline(
         task_id: Unique task identifier for tracking. / 用于跟踪的唯一任务标识符。
         stock_codes: Optional list of stock codes to sync. / 可选的要同步的股票代码列表。
         mode: Sync mode string (e.g. 'full', 'incremental'). / 同步模式字符串。
+
     """
     from app.config import Settings
     from app.database import async_session_factory
@@ -59,7 +67,8 @@ async def _run_sync_inline(
 
 @router.post("", response_model=dict)
 async def trigger_sync(request: SyncRequest):
-    """Trigger a sync task via Celery or inline execution.
+    """
+        Trigger a sync task via Celery or inline execution.
 
     触发同步任务，通过 Celery 或内联执行。
 
@@ -76,6 +85,7 @@ async def trigger_sync(request: SyncRequest):
     Returns:
         dict: {"task_id": str} for tracking the sync task status.
               {"task_id": str} 用于跟踪同步任务状态。
+
     """
     settings = get_settings()
 
@@ -111,7 +121,8 @@ async def trigger_sync(request: SyncRequest):
 
 @router.get("/status/{task_id}", response_model=SyncStatusResponse)
 async def get_sync_status(task_id: str):
-    """Query the current status of a sync task by its task ID.
+    """
+        Query the current status of a sync task by its task ID.
 
     通过任务 ID 查询同步任务的当前状态。
 
@@ -128,6 +139,7 @@ async def get_sync_status(task_id: str):
     Returns:
         SyncStatusResponse: Current task status with progress details and any errors.
                             包含进度详情和错误信息的当前任务状态。
+
     """
     settings = get_settings()
 

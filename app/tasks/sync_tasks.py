@@ -1,3 +1,9 @@
+"""
+Celery task definitions for HKEX announcement sync.
+
+港交所公告同步的 Celery 任务定义。
+"""
+
 import asyncio
 import logging
 from typing import Any
@@ -19,7 +25,9 @@ def sync_announcements_task(
     date_from: str | None = None,
     date_to: str | None = None,
 ) -> dict[str, Any]:
-    """Celery task to sync announcements from HKEX."""
+    """
+    Celery task to sync announcements from HKEX.
+    """
     from app.config import Settings
     from app.database import async_session_factory
     from app.services.sync_service import SyncService
@@ -49,6 +57,8 @@ def sync_announcements_task(
 
 @celery_app.task(name="app.tasks.sync_tasks.scheduled_incremental_sync")
 def scheduled_incremental_sync() -> dict[str, Any]:
-    """Beat-scheduled incremental sync for all configured stock codes."""
+    """
+    Beat-scheduled incremental sync for all configured stock codes.
+    """
     logger.info("Starting scheduled incremental sync")
     return sync_announcements_task.delay(mode="incremental").id

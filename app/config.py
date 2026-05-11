@@ -1,3 +1,9 @@
+"""
+Application configuration loaded from environment variables.
+
+从环境变量加载的应用配置模块。
+"""
+
 from enum import Enum
 from functools import lru_cache
 
@@ -6,13 +12,15 @@ from pydantic_settings import BaseSettings
 
 
 class StorageBackend(str, Enum):
-    """Supported file storage backend types.
+    """
+        Supported file storage backend types.
 
     支持的文件存储后端类型枚举。
 
     Attributes:
         LOCAL: Local filesystem storage. / 本地文件系统存储。
         S3: S3-compatible object storage. / S3 兼容的对象存储。
+
     """
 
     LOCAL = "local"
@@ -20,7 +28,8 @@ class StorageBackend(str, Enum):
 
 
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables and .env file.
+    """
+        Application settings loaded from environment variables and .env file.
 
     从环境变量和 .env 文件加载的应用配置类。
 
@@ -57,6 +66,7 @@ class Settings(BaseSettings):
         PAGE_SIZE_DEFAULT: Default pagination page size. / 默认分页大小。
         PAGE_SIZE_MAX: Maximum pagination page size. / 最大分页大小。
         DEFAULT_LANGUAGE: Default response language. / 默认响应语言。
+
     """
 
     # Database — SQLite for local dev, MySQL/PostgreSQL for production
@@ -102,10 +112,20 @@ class Settings(BaseSettings):
     @computed_field
     @property
     def stock_codes(self) -> list[str]:
+        """
+            Parse SYNC_STOCK_CODES into a list of stock code strings.
+
+        将 SYNC_STOCK_CODES 解析为股票代码列表。
+        """
         return [code.strip() for code in self.SYNC_STOCK_CODES.split(",") if code.strip()]
 
     @property
     def is_sqlite(self) -> bool:
+        """
+            Check if the database backend is SQLite.
+
+        检查数据库后端是否为 SQLite。
+        """
         return "sqlite" in self.DATABASE_URL
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
@@ -113,11 +133,13 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    """Get a cached singleton Settings instance.
+    """
+        Get a cached singleton Settings instance.
 
     获取缓存的 Settings 单例实例。
 
     Returns:
         Settings: The application settings object. / 应用配置对象。
+
     """
     return Settings()

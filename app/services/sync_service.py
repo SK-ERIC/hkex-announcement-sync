@@ -1,3 +1,9 @@
+"""
+Sync orchestration service for HKEX announcement pipeline.
+
+港交所公告同步流水线的编排服务。
+"""
+
 import logging
 from datetime import date, datetime, timedelta
 from typing import Any
@@ -14,13 +20,15 @@ logger = logging.getLogger(__name__)
 
 
 class SyncService:
-    """Orchestrates the full sync pipeline: scrape metadata -> dedup -> store -> download PDFs.
+    """
+        Orchestrates the full sync pipeline: scrape metadata -> dedup -> store -> download PDFs.
 
     编排完整的同步流水线：抓取元数据 -> 去重 -> 存储 -> 下载 PDF 文件。
     """
 
     def __init__(self, db: AsyncSession, settings: Settings | None = None):
-        """Initialize the sync service with a database session and optional settings.
+        """
+            Initialize the sync service with a database session and optional settings.
 
         使用数据库会话和可选配置初始化同步服务。
 
@@ -28,13 +36,15 @@ class SyncService:
             db: Async SQLAlchemy database session. / 异步 SQLAlchemy 数据库会话。
             settings: Application settings. Uses defaults if None.
                       应用配置。为 None 时使用默认值。
+
         """
         self._db = db
         self._settings = settings or Settings()
         self._storage = create_storage_backend(self._settings)
 
     def run(self, task_state: dict | None = None) -> dict[str, Any]:
-        """Run the full sync pipeline for all configured stock codes.
+        """
+            Run the full sync pipeline for all configured stock codes.
 
         对所有已配置的股票代码运行完整同步流水线。
 
@@ -45,6 +55,7 @@ class SyncService:
         Returns:
             dict[str, Any]: Summary with keys: total, synced, skipped, failed, errors.
                             包含 total、synced、skipped、failed、errors 键的摘要字典。
+
         """
         stock_codes = self._settings.stock_codes
         total_synced = 0
@@ -81,7 +92,8 @@ class SyncService:
         stock_code: str,
         task_state: dict | None,
     ) -> tuple[int, int, int, list[str]]:
-        """Sync a single stock code by running the async pipeline in a new event loop.
+        """
+            Sync a single stock code by running the async pipeline in a new event loop.
 
         通过在新事件循环中运行异步流水线来同步单个股票代码。
 
@@ -94,6 +106,7 @@ class SyncService:
         Returns:
             tuple[int, int, int, list[str]]: (synced, skipped, failed, errors) counts.
                                              （已同步、已跳过、已失败、错误列表）计数。
+
         """
         import asyncio
 
@@ -110,7 +123,8 @@ class SyncService:
         stock_code: str,
         task_state: dict | None,
     ) -> tuple[int, int, int, list[str]]:
-        """Async implementation of stock sync: resolve ID, fetch metadata, dedup, insert, download PDFs.
+        """
+            Async implementation of stock sync: resolve ID, fetch metadata, dedup, insert, download PDFs.
 
         股票同步的异步实现：解析 ID、获取元数据、去重、插入、下载 PDF。
 
@@ -132,6 +146,7 @@ class SyncService:
         Returns:
             tuple[int, int, int, list[str]]: (synced, skipped, failed, errors) counts.
                                              （已同步、已跳过、已失败、错误列表）计数。
+
         """
         # 1. Resolve stock ID
         stock_id = client.get_stock_id(stock_code)

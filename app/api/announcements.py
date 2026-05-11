@@ -1,3 +1,9 @@
+"""
+API endpoints for querying and downloading HKEX announcements.
+
+港交所公告查询和下载的 API 端点。
+"""
+
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -20,7 +26,8 @@ router = APIRouter(prefix="/announcements", tags=["announcements"])
 
 
 def _get_lang_fields(ann: Announcement, language: LanguageEnum) -> dict:
-    """Extract the language-appropriate fields from an Announcement model instance.
+    """
+        Extract the language-appropriate fields from an Announcement model instance.
 
     从 Announcement 模型实例中提取指定语言对应的字段。
 
@@ -33,6 +40,7 @@ def _get_lang_fields(ann: Announcement, language: LanguageEnum) -> dict:
               short_text, long_text, hkex_url.
               包含 title、stock_name、filing_type、short_text、
               long_text、hkex_url 键的字典。
+
     """
     lang_map = {
         LanguageEnum.en: "en",
@@ -72,7 +80,8 @@ async def list_announcements(
     language: LanguageEnum = Query(LanguageEnum.en),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get a paginated announcement list with optional filters and language support.
+    """
+        Get a paginated announcement list with optional filters and language support.
 
     获取带分页的公告列表，支持可选过滤和多语言。
 
@@ -88,6 +97,7 @@ async def list_announcements(
     Returns:
         AnnouncementListResponse: Paginated announcement results.
                                   分页的公告查询结果。
+
     """
     from datetime import date as date_type
 
@@ -141,7 +151,8 @@ async def get_announcement(
     language: LanguageEnum = Query(LanguageEnum.en),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get a single announcement's full details in the specified language.
+    """
+        Get a single announcement's full details in the specified language.
 
     获取指定语言的单条公告完整详情。
 
@@ -156,6 +167,7 @@ async def get_announcement(
 
     Raises:
         HTTPException: 404 if announcement not found. / 公告未找到时返回 404。
+
     """
     announcement = await announcement_service.get_announcement_by_id(db, announcement_id)
     if not announcement:
@@ -191,7 +203,8 @@ async def download_announcement(
     language: LanguageEnum = Query(LanguageEnum.en),
     db: AsyncSession = Depends(get_db),
 ):
-    """Download the PDF file for an announcement in the specified language.
+    """
+        Download the PDF file for an announcement in the specified language.
 
     下载指定语言的公告 PDF 文件。
 
@@ -206,6 +219,7 @@ async def download_announcement(
 
     Raises:
         HTTPException: 404 if announcement or file not found. / 公告或文件未找到时返回 404。
+
     """
     announcement = await announcement_service.get_announcement_by_id(db, announcement_id)
     if not announcement:

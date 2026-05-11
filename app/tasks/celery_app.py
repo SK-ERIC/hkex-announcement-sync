@@ -1,3 +1,9 @@
+"""
+Celery application configuration and beat schedule.
+
+Celery 应用配置和定时任务调度。
+"""
+
 from celery import Celery
 
 from app.config import get_settings

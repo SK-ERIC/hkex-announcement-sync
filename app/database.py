@@ -1,3 +1,9 @@
+"""
+Database engine, session factory, and dependency injection helpers.
+
+数据库引擎、会话工厂和依赖注入辅助模块。
+"""
+
 from collections.abc import AsyncGenerator
 from pathlib import Path
 
@@ -36,12 +42,19 @@ async_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_o
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """
+        Yield an async database session for FastAPI dependency injection.
+
+    为 FastAPI 依赖注入提供异步数据库会话。
+    """
     async with async_session_factory() as session:
         yield session
 
 
 async def init_db():
-    """Create all tables. Used for SQLite which doesn't use Alembic migrations in dev."""
+    """
+    Create all tables. Used for SQLite which doesn't use Alembic migrations in dev.
+    """
     from app.models import Base
 
     settings = get_settings()

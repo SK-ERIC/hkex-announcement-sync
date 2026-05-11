@@ -1,3 +1,9 @@
+"""
+Database service for announcement CRUD operations.
+
+公告 CRUD 操作的数据库服务模块。
+"""
+
 import uuid
 from datetime import date, datetime
 
@@ -12,7 +18,8 @@ async def get_announcements(
     db: AsyncSession,
     params: AnnouncementListParams,
 ) -> tuple[list[Announcement], int]:
-    """Get paginated announcements with optional filters for stock code and date range.
+    """
+        Get paginated announcements with optional filters for stock code and date range.
 
     获取带分页的公告列表，支持按股票代码和日期范围过滤。
 
@@ -24,6 +31,7 @@ async def get_announcements(
     Returns:
         tuple[list[Announcement], int]: A tuple of (announcement items, total count).
                                         （公告项目列表，总数）的元组。
+
     """
     query = select(Announcement).where(Announcement.is_visible == True)  # noqa: E712
 
@@ -51,7 +59,8 @@ async def get_announcement_by_id(
     db: AsyncSession,
     announcement_id: uuid.UUID,
 ) -> Announcement | None:
-    """Retrieve a single announcement by its UUID.
+    """
+        Retrieve a single announcement by its UUID.
 
     通过 UUID 获取单条公告。
 
@@ -62,6 +71,7 @@ async def get_announcement_by_id(
     Returns:
         Announcement | None: The announcement object, or None if not found.
                              公告对象，未找到时返回 None。
+
     """
     result = await db.execute(select(Announcement).where(Announcement.id == announcement_id))
     return result.scalar_one_or_none()
@@ -72,7 +82,8 @@ async def get_existing_news_ids(
     stock_code: str,
     news_ids: list[str],
 ) -> set[str]:
-    """Get the set of news_ids that already exist in the database for a given stock code.
+    """
+        Get the set of news_ids that already exist in the database for a given stock code.
 
     获取指定股票代码下已存在于数据库中的 news_id 集合。
 
@@ -83,6 +94,7 @@ async def get_existing_news_ids(
 
     Returns:
         set[str]: Set of existing news_id values. / 已存在的 news_id 值集合。
+
     """
     if not news_ids:
         return set()
@@ -99,7 +111,8 @@ async def get_last_sync_date(
     db: AsyncSession,
     stock_code: str,
 ) -> date | None:
-    """Get the most recent announcement_date for a given stock code.
+    """
+        Get the most recent announcement_date for a given stock code.
 
     获取指定股票代码的最新公告日期。
 
@@ -110,6 +123,7 @@ async def get_last_sync_date(
     Returns:
         date | None: The latest announcement date, or None if no records exist.
                      最新公告日期，无记录时返回 None。
+
     """
     result = await db.execute(
         select(func.max(Announcement.announcement_date)).where(Announcement.stock_code == stock_code)
@@ -121,7 +135,8 @@ async def bulk_insert_announcements(
     db: AsyncSession,
     records: list[dict],
 ) -> int:
-    """Bulk insert announcement records into the database.
+    """
+        Bulk insert announcement records into the database.
 
     批量插入公告记录到数据库。
 
@@ -132,6 +147,7 @@ async def bulk_insert_announcements(
 
     Returns:
         int: Number of inserted rows. / 插入的行数。
+
     """
     if not records:
         return 0
@@ -148,7 +164,8 @@ async def update_announcement_file(
     file_size: int,
     file_hash: str,
 ) -> None:
-    """Update the file storage metadata for an announcement.
+    """
+        Update the file storage metadata for an announcement.
 
     更新公告的文件存储元数据。
 
@@ -158,6 +175,7 @@ async def update_announcement_file(
         file_path: Storage path of the downloaded file. / 下载文件的存储路径。
         file_size: File size in bytes. / 文件大小（字节）。
         file_hash: SHA-256 hash of the file. / 文件的 SHA-256 哈希值。
+
     """
     announcement = await get_announcement_by_id(db, announcement_id)
     if announcement:
