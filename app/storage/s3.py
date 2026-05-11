@@ -1,4 +1,3 @@
-import io
 from collections.abc import Iterator
 
 import boto3

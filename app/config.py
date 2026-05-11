@@ -14,6 +14,7 @@ class StorageBackend(str, Enum):
         LOCAL: Local filesystem storage. / 本地文件系统存储。
         S3: S3-compatible object storage. / S3 兼容的对象存储。
     """
+
     LOCAL = "local"
     S3 = "s3"
 
@@ -57,6 +58,7 @@ class Settings(BaseSettings):
         PAGE_SIZE_MAX: Maximum pagination page size. / 最大分页大小。
         DEFAULT_LANGUAGE: Default response language. / 默认响应语言。
     """
+
     # Database — SQLite for local dev, MySQL/PostgreSQL for production
     DATABASE_URL: str = "sqlite+aiosqlite:///./data/hkex_sync.db"
 

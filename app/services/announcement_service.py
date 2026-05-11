@@ -4,7 +4,7 @@ from datetime import date, datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Announcement, SourceType
+from app.models import Announcement
 from app.schemas.announcement import AnnouncementListParams
 
 
@@ -63,9 +63,7 @@ async def get_announcement_by_id(
         Announcement | None: The announcement object, or None if not found.
                              公告对象，未找到时返回 None。
     """
-    result = await db.execute(
-        select(Announcement).where(Announcement.id == announcement_id)
-    )
+    result = await db.execute(select(Announcement).where(Announcement.id == announcement_id))
     return result.scalar_one_or_none()
 
 
@@ -114,9 +112,7 @@ async def get_last_sync_date(
                      最新公告日期，无记录时返回 None。
     """
     result = await db.execute(
-        select(func.max(Announcement.announcement_date)).where(
-            Announcement.stock_code == stock_code
-        )
+        select(func.max(Announcement.announcement_date)).where(Announcement.stock_code == stock_code)
     )
     return result.scalar()
 

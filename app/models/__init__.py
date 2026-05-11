@@ -12,6 +12,7 @@ class Base(DeclarativeBase):
 
     所有 ORM 模型的 SQLAlchemy 声明式基类。
     """
+
     pass
 
 
@@ -24,6 +25,7 @@ class SourceType(str, PyEnum):
         AUTO: Automatically synced from HKEX. / 从港交所自动同步。
         MANUAL: Manually entered by user. / 用户手动录入。
     """
+
     AUTO = "auto"
     MANUAL = "manual"
 
@@ -60,6 +62,7 @@ class Announcement(Base):
         created_at: Record creation timestamp. / 记录创建时间戳。
         updated_at: Record update timestamp. / 记录更新时间戳。
     """
+
     __tablename__ = "announcements"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -101,18 +104,12 @@ class Announcement(Base):
     file_size: Mapped[int | None] = mapped_column(BIGINT, nullable=True)
     file_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
-    source: Mapped[SourceType] = mapped_column(
-        Enum(SourceType), nullable=False, default=SourceType.AUTO
-    )
+    source: Mapped[SourceType] = mapped_column(Enum(SourceType), nullable=False, default=SourceType.AUTO)
     is_visible: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
-    __table_args__ = (
-        Index("ix_stock_code_news_id", "stock_code", "news_id", unique=True),
-    )
+    __table_args__ = (Index("ix_stock_code_news_id", "stock_code", "news_id", unique=True),)

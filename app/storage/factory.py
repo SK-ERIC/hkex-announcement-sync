@@ -1,4 +1,5 @@
-from app.config import Settings, StorageBackend as StorageBackendEnum
+from app.config import Settings
+from app.config import StorageBackend as StorageBackendEnum
 from app.storage.base import StorageBackend
 from app.storage.local import LocalStorage
 from app.storage.s3 import S3Storage

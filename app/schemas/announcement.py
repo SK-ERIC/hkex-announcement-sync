@@ -15,6 +15,7 @@ class LanguageEnum(str, Enum):
         zh: Traditional Chinese / 繁体中文
         cn: Simplified Chinese / 简体中文
     """
+
     en = "en"
     zh = "zh"
     cn = "cn"
@@ -29,6 +30,7 @@ class SortOrderEnum(str, Enum):
         desc: Descending order / 降序
         asc: Ascending order / 升序
     """
+
     desc = "desc"
     asc = "asc"
 
@@ -44,6 +46,7 @@ class AnnouncementResponse(BaseModel):
     Returns language-specific fields based on the requested language.
     根据请求的语言返回对应语言的字段。
     """
+
     id: UUID
     stock_code: str
     news_id: str
@@ -70,6 +73,7 @@ class AnnouncementListResponse(BaseModel):
 
     包含多条公告的分页列表响应模式。
     """
+
     items: list[AnnouncementResponse]
     total: int
     page: int
@@ -81,6 +85,7 @@ class AnnouncementDetailResponse(AnnouncementResponse):
 
     包含额外文件元数据字段的扩展公告响应模式。
     """
+
     file_hash: str | None = None
     last_synced_at: datetime | None = None
 
@@ -90,6 +95,7 @@ class AnnouncementListParams(BaseModel):
 
     用于过滤和分页公告列表请求的查询参数模式。
     """
+
     stock_code: str | None = None
     date_from: date | None = None
     date_to: date | None = None
@@ -106,6 +112,7 @@ class DataStatus(BaseModel):
 
     公告 API 响应的状态元数据模式。
     """
+
     status_code: int = 100
     status_description: str = "正常返回"
     response_date_time: str = ""
@@ -117,6 +124,7 @@ class BulletinData(BaseModel):
 
     港交所兼容格式的单条公告数据模式。
     """
+
     symbol: str
     stock_name: str
     title: str
@@ -134,6 +142,7 @@ class BulletinListResponse(BaseModel):
 
     公告 API 的响应模式，包含状态和数据列表。
     """
+
     data_status: DataStatus
     data: list[BulletinData]
 
@@ -143,6 +152,7 @@ class BulletinQueryParams(BaseModel):
 
     公告 API 的查询参数，包含分页、语言和排序选项。
     """
+
     symbol: str
     pageindex: int = Field(default=1, ge=1)
     pagesize: int = Field(default=10, ge=1, le=20)

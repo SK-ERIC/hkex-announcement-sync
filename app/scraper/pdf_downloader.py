@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
 import httpx
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.config import Settings
 from app.storage.base import StorageBackend
@@ -85,10 +85,7 @@ class PDFDownloader:
         concurrency = self._settings.SYNC_CONCURRENCY
 
         with ThreadPoolExecutor(max_workers=concurrency) as executor:
-            futures = {
-                executor.submit(self.download_single, url, key): key
-                for url, key in tasks
-            }
+            futures = {executor.submit(self.download_single, url, key): key for url, key in tasks}
             for future in as_completed(futures):
                 results.append(future.result())
 

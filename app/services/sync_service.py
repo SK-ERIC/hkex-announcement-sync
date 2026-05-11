@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
 from app.scraper.hkex_client import HKEXClient
-from app.scraper.pdf_downloader import DownloadResult, PDFDownloader
+from app.scraper.pdf_downloader import PDFDownloader
 from app.services import announcement_service
 from app.storage.factory import create_storage_backend
 
@@ -99,9 +99,7 @@ class SyncService:
 
         loop = asyncio.new_event_loop()
         try:
-            return loop.run_until_complete(
-                self._sync_stock_async(client, downloader, stock_code, task_state)
-            )
+            return loop.run_until_complete(self._sync_stock_async(client, downloader, stock_code, task_state))
         finally:
             loop.close()
 
@@ -163,31 +161,33 @@ class SyncService:
         # 5. Insert metadata to DB
         db_records = []
         for r in new_records:
-            db_records.append({
-                "stock_code": r["stock_code"],
-                "news_id": r["news_id"],
-                "title_en": r.get("title_en", ""),
-                "title_zh": r.get("title_zh", ""),
-                "title_cn": r.get("title_cn", ""),
-                "stock_name_en": r.get("stock_name_en", ""),
-                "stock_name_zh": r.get("stock_name_zh", ""),
-                "stock_name_cn": r.get("stock_name_cn", ""),
-                "filing_type_en": r.get("filing_type_en", ""),
-                "filing_type_zh": r.get("filing_type_zh", ""),
-                "filing_type_cn": r.get("filing_type_cn", ""),
-                "short_text_en": r.get("short_text_en", ""),
-                "short_text_zh": r.get("short_text_zh", ""),
-                "short_text_cn": r.get("short_text_cn", ""),
-                "long_text_en": r.get("long_text_en", ""),
-                "long_text_zh": r.get("long_text_zh", ""),
-                "long_text_cn": r.get("long_text_cn", ""),
-                "hkex_url_en": r.get("hkex_url_en", ""),
-                "hkex_url_zh": r.get("hkex_url_zh", ""),
-                "file_type": r.get("file_type", "PDF"),
-                "announcement_date": r.get("announcement_date"),
-                "source": "auto",
-                "last_synced_at": datetime.utcnow(),
-            })
+            db_records.append(
+                {
+                    "stock_code": r["stock_code"],
+                    "news_id": r["news_id"],
+                    "title_en": r.get("title_en", ""),
+                    "title_zh": r.get("title_zh", ""),
+                    "title_cn": r.get("title_cn", ""),
+                    "stock_name_en": r.get("stock_name_en", ""),
+                    "stock_name_zh": r.get("stock_name_zh", ""),
+                    "stock_name_cn": r.get("stock_name_cn", ""),
+                    "filing_type_en": r.get("filing_type_en", ""),
+                    "filing_type_zh": r.get("filing_type_zh", ""),
+                    "filing_type_cn": r.get("filing_type_cn", ""),
+                    "short_text_en": r.get("short_text_en", ""),
+                    "short_text_zh": r.get("short_text_zh", ""),
+                    "short_text_cn": r.get("short_text_cn", ""),
+                    "long_text_en": r.get("long_text_en", ""),
+                    "long_text_zh": r.get("long_text_zh", ""),
+                    "long_text_cn": r.get("long_text_cn", ""),
+                    "hkex_url_en": r.get("hkex_url_en", ""),
+                    "hkex_url_zh": r.get("hkex_url_zh", ""),
+                    "file_type": r.get("file_type", "PDF"),
+                    "announcement_date": r.get("announcement_date"),
+                    "source": "auto",
+                    "last_synced_at": datetime.utcnow(),
+                }
+            )
 
         await announcement_service.bulk_insert_announcements(self._db, db_records)
         await self._db.commit()
@@ -195,11 +195,10 @@ class SyncService:
         # Re-fetch inserted records to get their IDs for PDF download
         inserted_news_ids = [r["news_id"] for r in db_records]
         from sqlalchemy import select
+
         from app.models import Announcement
 
-        result = await self._db.execute(
-            select(Announcement).where(Announcement.news_id.in_(inserted_news_ids))
-        )
+        result = await self._db.execute(select(Announcement).where(Announcement.news_id.in_(inserted_news_ids)))
         inserted_announcements = list(result.scalars().all())
 
         # 6. Download PDFs (EN and ZH versions)

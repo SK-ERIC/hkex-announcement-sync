@@ -239,7 +239,10 @@ class HKEXClient:
 
             logger.info(
                 "Fetching lang=%s: stock_id=%s, %s to %s",
-                lang, stock_id, chunk_start, chunk_end,
+                lang,
+                stock_id,
+                chunk_start,
+                chunk_end,
             )
             records = self._fetch_chunk(stock_id, chunk_start, chunk_end, lang=lang)
             all_records.extend(records)
@@ -309,11 +312,7 @@ class HKEXClient:
         fa_match = re.search(r'<form[^>]*action="([^"]+)"', html)
         form_action = fa_match.group(1) if fa_match else ""
 
-        submit_url = (
-            f"{HKEX_BASE_URL}{form_action}"
-            if form_action.startswith("/")
-            else form_action
-        )
+        submit_url = f"{HKEX_BASE_URL}{form_action}" if form_action.startswith("/") else form_action
 
         # Step 2: POST JSF form to set date range on server session
         if submit_url and view_state:
@@ -477,6 +476,7 @@ class HKEXClient:
         """
         try:
             import opencc
+
             converter = opencc.OpenCC("t2s")
         except Exception:
             logger.warning("opencc not available, SC fields will be empty")

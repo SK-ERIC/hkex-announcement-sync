@@ -3,12 +3,10 @@ import logging
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter
 
 from app.config import get_settings
-from app.database import get_db
-from app.schemas.sync import SyncMode, SyncRequest, SyncProgress, SyncStatusResponse
+from app.schemas.sync import SyncProgress, SyncRequest, SyncStatusResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/sync", tags=["sync"])
@@ -37,7 +35,7 @@ async def _run_sync_inline(
 
     settings = Settings()
     if stock_codes:
-        settings = settings.model_copy(update={"SYNC_STOCK_CODES": ",".join(stock_codes) if stock_codes else settings.SYNC_STOCK_CODES})
+        settings = settings.model_copy(update={"SYNC_STOCK_CODES": ",".join(stock_codes)})
 
     _tasks[task_id]["status"] = "running"
 
@@ -143,9 +141,7 @@ async def get_sync_status(task_id: str):
         elif result.state == "RUNNING":
             meta = result.info or {}
             progress = meta.get("progress", {})
-            return SyncStatusResponse(
-                task_id=task_id, status="running", progress=SyncProgress(**progress)
-            )
+            return SyncStatusResponse(task_id=task_id, status="running", progress=SyncProgress(**progress))
         elif result.state == "SUCCESS":
             info = result.result or {}
             return SyncStatusResponse(

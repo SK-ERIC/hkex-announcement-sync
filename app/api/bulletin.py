@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.announcements import _get_lang_fields
 from app.database import get_db
 from app.models import Announcement
 from app.schemas.announcement import (
@@ -13,7 +14,6 @@ from app.schemas.announcement import (
     LanguageEnum,
     SortOrderEnum,
 )
-from app.api.announcements import _get_lang_fields
 
 router = APIRouter(prefix="/bulletin", tags=["bulletin"])
 
@@ -80,18 +80,20 @@ async def list_bulletins(
             else:
                 file_size_str = f"{ann.file_size / 1024:.0f}KB"
 
-        bulletin_data.append(BulletinData(
-            symbol=ann.stock_code,
-            stock_name=lang_fields["stock_name"],
-            title=lang_fields["title"],
-            short_text=lang_fields["short_text"],
-            long_text=lang_fields["long_text"],
-            file_size=file_size_str or None,
-            file_type=ann.file_type,
-            file_link=lang_fields["hkex_url"] or None,
-            bulletin_date_time=bulletin_dt or None,
-            unique_id=ann.news_id,
-        ))
+        bulletin_data.append(
+            BulletinData(
+                symbol=ann.stock_code,
+                stock_name=lang_fields["stock_name"],
+                title=lang_fields["title"],
+                short_text=lang_fields["short_text"],
+                long_text=lang_fields["long_text"],
+                file_size=file_size_str or None,
+                file_type=ann.file_type,
+                file_link=lang_fields["hkex_url"] or None,
+                bulletin_date_time=bulletin_dt or None,
+                unique_id=ann.news_id,
+            )
+        )
 
     return BulletinListResponse(
         data_status=DataStatus(

@@ -105,25 +105,27 @@ async def list_announcements(
     responses = []
     for item in items:
         lang_fields = _get_lang_fields(item, language)
-        responses.append(AnnouncementResponse(
-            id=item.id,
-            stock_code=item.stock_code,
-            news_id=item.news_id,
-            title=lang_fields["title"],
-            stock_name=lang_fields["stock_name"],
-            filing_type=lang_fields["filing_type"],
-            short_text=lang_fields["short_text"],
-            long_text=lang_fields["long_text"],
-            hkex_url=lang_fields["hkex_url"],
-            file_type=item.file_type,
-            file_size=item.file_size,
-            announcement_date=item.announcement_date,
-            source=item.source.value,
-            is_visible=item.is_visible,
-            download_url=f"/api/announcements/{item.id}/download",
-            created_at=item.created_at,
-            updated_at=item.updated_at,
-        ))
+        responses.append(
+            AnnouncementResponse(
+                id=item.id,
+                stock_code=item.stock_code,
+                news_id=item.news_id,
+                title=lang_fields["title"],
+                stock_name=lang_fields["stock_name"],
+                filing_type=lang_fields["filing_type"],
+                short_text=lang_fields["short_text"],
+                long_text=lang_fields["long_text"],
+                hkex_url=lang_fields["hkex_url"],
+                file_type=item.file_type,
+                file_size=item.file_size,
+                announcement_date=item.announcement_date,
+                source=item.source.value,
+                is_visible=item.is_visible,
+                download_url=f"/api/announcements/{item.id}/download",
+                created_at=item.created_at,
+                updated_at=item.updated_at,
+            )
+        )
 
     return AnnouncementListResponse(
         items=responses,
@@ -219,6 +221,7 @@ async def download_announcement(
 
     storage = create_storage_backend()
     from app.config import get_settings
+
     settings = get_settings()
 
     if settings.STORAGE_BACKEND.value == "s3":
