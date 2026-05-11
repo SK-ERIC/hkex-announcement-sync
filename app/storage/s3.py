@@ -26,7 +26,7 @@ class S3Storage(StorageBackend):
         region: str = "",
     ):
         """
-            Initialize S3 storage with connection credentials.
+        Initialize S3 storage with connection credentials.
 
         使用连接凭证初始化 S3 存储。
         """
@@ -49,7 +49,7 @@ class S3Storage(StorageBackend):
 
     def save(self, key: str, data: bytes) -> str:
         """
-            Upload data to S3 and return the key.
+        Upload data to S3 and return the key.
 
         上传数据到 S3 并返回 key。
         """
@@ -58,7 +58,7 @@ class S3Storage(StorageBackend):
 
     def get_url(self, key: str) -> str:
         """
-            Generate a presigned download URL for the file.
+        Generate a presigned download URL for the file.
 
         生成文件的预签名下载 URL。
         """
@@ -70,7 +70,7 @@ class S3Storage(StorageBackend):
 
     def exists(self, key: str) -> bool:
         """
-            Check if an object exists in the S3 bucket.
+        Check if an object exists in the S3 bucket.
 
         检查 S3 桶中对象是否存在。
         """
@@ -82,7 +82,7 @@ class S3Storage(StorageBackend):
 
     def get_file_stream(self, key: str) -> Iterator[bytes]:
         """
-            Stream object content in chunks from S3.
+        Stream object content in chunks from S3.
 
         从 S3 以分块方式流式读取对象内容。
         """
@@ -91,7 +91,7 @@ class S3Storage(StorageBackend):
 
     def get_file_size(self, key: str) -> int:
         """
-            Get object size in bytes from S3 metadata.
+        Get object size in bytes from S3 metadata.
 
         从 S3 元数据获取对象大小（字节）。
         """

@@ -43,7 +43,7 @@ async_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_o
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
-        Yield an async database session for FastAPI dependency injection.
+    Yield an async database session for FastAPI dependency injection.
 
     为 FastAPI 依赖注入提供异步数据库会话。
     """

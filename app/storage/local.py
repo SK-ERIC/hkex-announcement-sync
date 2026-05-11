@@ -18,7 +18,7 @@ class LocalStorage(StorageBackend):
 
     def __init__(self, base_path: str):
         """
-            Initialize local storage at the given base directory.
+        Initialize local storage at the given base directory.
 
         在指定基础目录初始化本地存储。
         """
@@ -32,7 +32,7 @@ class LocalStorage(StorageBackend):
 
     def save(self, key: str, data: bytes) -> str:
         """
-            Save data to a file and return its path.
+        Save data to a file and return its path.
 
         将数据保存到文件并返回路径。
         """
@@ -42,7 +42,7 @@ class LocalStorage(StorageBackend):
 
     def get_url(self, key: str) -> str:
         """
-            Get the local file path as a URL.
+        Get the local file path as a URL.
 
         获取本地文件路径作为 URL。
         """
@@ -50,7 +50,7 @@ class LocalStorage(StorageBackend):
 
     def exists(self, key: str) -> bool:
         """
-            Check if the file exists at the given key.
+        Check if the file exists at the given key.
 
         检查给定 key 的文件是否存在。
         """
@@ -58,7 +58,7 @@ class LocalStorage(StorageBackend):
 
     def get_file_stream(self, key: str) -> Iterator[bytes]:
         """
-            Stream file content in chunks.
+        Stream file content in chunks.
 
         以分块方式流式读取文件内容。
         """
@@ -71,7 +71,7 @@ class LocalStorage(StorageBackend):
 
     def get_file_size(self, key: str) -> int:
         """
-            Get file size in bytes.
+        Get file size in bytes.
 
         获取文件大小（字节）。
         """

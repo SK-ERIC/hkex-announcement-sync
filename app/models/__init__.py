@@ -15,7 +15,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 class Base(DeclarativeBase):
     """
-        SQLAlchemy declarative base class for all ORM models.
+    SQLAlchemy declarative base class for all ORM models.
 
     所有 ORM 模型的 SQLAlchemy 声明式基类。
     """
@@ -25,13 +25,13 @@ class Base(DeclarativeBase):
 
 class SourceType(str, PyEnum):
     """
-        Enumeration of announcement data source types.
+    Enumeration of announcement data source types.
 
     公告数据来源类型的枚举。
 
     Attributes:
-        AUTO: Automatically synced from HKEX. / 从港交所自动同步。
-        MANUAL: Manually entered by user. / 用户手动录入。
+    AUTO: Automatically synced from HKEX. / 从港交所自动同步。
+    MANUAL: Manually entered by user. / 用户手动录入。
 
     """
 
@@ -41,7 +41,7 @@ class SourceType(str, PyEnum):
 
 class Announcement(Base):
     """
-        ORM model representing an HKEX announcement with multilingual fields.
+    ORM model representing an HKEX announcement with multilingual fields.
 
     港交所公告的 ORM 模型，包含多语言字段。
 
@@ -52,25 +52,25 @@ class Announcement(Base):
     同时包含文件存储信息。
 
     Attributes:
-        id: Unique UUID primary key. / 唯一 UUID 主键。
-        stock_code: HKEX stock code (e.g. '00700'). / 港交所股票代码。
-        news_id: HKEX news identifier. / 港交所新闻标识符。
-        announcement_date: Date and time of the announcement. / 公告日期时间。
-        title_en/zh/cn: Multilingual announcement titles. / 多语言公告标题。
-        stock_name_en/zh/cn: Multilingual stock names. / 多语言股票名称。
-        filing_type_en/zh/cn: Multilingual filing types. / 多语言文件类型。
-        short_text_en/zh/cn: Multilingual short descriptions. / 多语言简短描述。
-        long_text_en/zh/cn: Multilingual long descriptions. / 多语言详细描述。
-        hkex_url_en/zh: HKEX disclosure URLs per language. / 各语言的港交所披露链接。
-        file_type: File format (e.g. 'PDF'). / 文件格式。
-        file_path_en/zh: Local storage paths for downloaded files. / 下载文件的本地存储路径。
-        file_size: File size in bytes. / 文件大小（字节）。
-        file_hash: SHA-256 hash of the file. / 文件的 SHA-256 哈希值。
-        source: Data source (auto/manual). / 数据来源（自动/手动）。
-        is_visible: Whether the announcement is visible in API. / 公告是否在 API 中可见。
-        last_synced_at: Timestamp of last sync. / 上次同步时间戳。
-        created_at: Record creation timestamp. / 记录创建时间戳。
-        updated_at: Record update timestamp. / 记录更新时间戳。
+    id: Unique UUID primary key. / 唯一 UUID 主键。
+    stock_code: HKEX stock code (e.g. '00700'). / 港交所股票代码。
+    news_id: HKEX news identifier. / 港交所新闻标识符。
+    announcement_date: Date and time of the announcement. / 公告日期时间。
+    title_en/zh/cn: Multilingual announcement titles. / 多语言公告标题。
+    stock_name_en/zh/cn: Multilingual stock names. / 多语言股票名称。
+    filing_type_en/zh/cn: Multilingual filing types. / 多语言文件类型。
+    short_text_en/zh/cn: Multilingual short descriptions. / 多语言简短描述。
+    long_text_en/zh/cn: Multilingual long descriptions. / 多语言详细描述。
+    hkex_url_en/zh: HKEX disclosure URLs per language. / 各语言的港交所披露链接。
+    file_type: File format (e.g. 'PDF'). / 文件格式。
+    file_path_en/zh: Local storage paths for downloaded files. / 下载文件的本地存储路径。
+    file_size: File size in bytes. / 文件大小（字节）。
+    file_hash: SHA-256 hash of the file. / 文件的 SHA-256 哈希值。
+    source: Data source (auto/manual). / 数据来源（自动/手动）。
+    is_visible: Whether the announcement is visible in API. / 公告是否在 API 中可见。
+    last_synced_at: Timestamp of last sync. / 上次同步时间戳。
+    created_at: Record creation timestamp. / 记录创建时间戳。
+    updated_at: Record update timestamp. / 记录更新时间戳。
 
     """
 

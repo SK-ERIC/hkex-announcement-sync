@@ -27,19 +27,19 @@ router = APIRouter(prefix="/announcements", tags=["announcements"])
 
 def _get_lang_fields(ann: Announcement, language: LanguageEnum) -> dict:
     """
-        Extract the language-appropriate fields from an Announcement model instance.
+    Extract the language-appropriate fields from an Announcement model instance.
 
     从 Announcement 模型实例中提取指定语言对应的字段。
 
     Args:
-        ann: The Announcement ORM model instance. / Announcement ORM 模型实例。
-        language: The requested language enum value. / 请求的语言枚举值。
+    ann: The Announcement ORM model instance. / Announcement ORM 模型实例。
+    language: The requested language enum value. / 请求的语言枚举值。
 
     Returns:
-        dict: Dictionary with keys: title, stock_name, filing_type,
-              short_text, long_text, hkex_url.
-              包含 title、stock_name、filing_type、short_text、
-              long_text、hkex_url 键的字典。
+    dict: Dictionary with keys: title, stock_name, filing_type,
+    short_text, long_text, hkex_url.
+    包含 title、stock_name、filing_type、short_text、
+    long_text、hkex_url 键的字典。
 
     """
     lang_map = {
@@ -81,22 +81,22 @@ async def list_announcements(
     db: AsyncSession = Depends(get_db),
 ):
     """
-        Get a paginated announcement list with optional filters and language support.
+    Get a paginated announcement list with optional filters and language support.
 
     获取带分页的公告列表，支持可选过滤和多语言。
 
     Args:
-        stock_code: Filter by stock code. / 按股票代码过滤。
-        date_from: Filter start date (ISO format). / 过滤起始日期（ISO 格式）。
-        date_to: Filter end date (ISO format). / 过滤结束日期（ISO 格式）。
-        page: Page number (1-based). / 页码（从 1 开始）。
-        page_size: Items per page (max 100). / 每页条数（最大 100）。
-        language: Response language (en/zh/cn). / 响应语言。
-        db: Async database session (injected). / 异步数据库会话（自动注入）。
+    stock_code: Filter by stock code. / 按股票代码过滤。
+    date_from: Filter start date (ISO format). / 过滤起始日期（ISO 格式）。
+    date_to: Filter end date (ISO format). / 过滤结束日期（ISO 格式）。
+    page: Page number (1-based). / 页码（从 1 开始）。
+    page_size: Items per page (max 100). / 每页条数（最大 100）。
+    language: Response language (en/zh/cn). / 响应语言。
+    db: Async database session (injected). / 异步数据库会话（自动注入）。
 
     Returns:
-        AnnouncementListResponse: Paginated announcement results.
-                                  分页的公告查询结果。
+    AnnouncementListResponse: Paginated announcement results.
+    分页的公告查询结果。
 
     """
     from datetime import date as date_type
@@ -152,21 +152,21 @@ async def get_announcement(
     db: AsyncSession = Depends(get_db),
 ):
     """
-        Get a single announcement's full details in the specified language.
+    Get a single announcement's full details in the specified language.
 
     获取指定语言的单条公告完整详情。
 
     Args:
-        announcement_id: UUID of the announcement. / 公告的 UUID。
-        language: Response language (en/zh/cn). / 响应语言。
-        db: Async database session (injected). / 异步数据库会话（自动注入）。
+    announcement_id: UUID of the announcement. / 公告的 UUID。
+    language: Response language (en/zh/cn). / 响应语言。
+    db: Async database session (injected). / 异步数据库会话（自动注入）。
 
     Returns:
-        AnnouncementDetailResponse: Detailed announcement data with file metadata.
-                                    包含文件元数据的公告详细数据。
+    AnnouncementDetailResponse: Detailed announcement data with file metadata.
+    包含文件元数据的公告详细数据。
 
     Raises:
-        HTTPException: 404 if announcement not found. / 公告未找到时返回 404。
+    HTTPException: 404 if announcement not found. / 公告未找到时返回 404。
 
     """
     announcement = await announcement_service.get_announcement_by_id(db, announcement_id)
@@ -204,21 +204,21 @@ async def download_announcement(
     db: AsyncSession = Depends(get_db),
 ):
     """
-        Download the PDF file for an announcement in the specified language.
+    Download the PDF file for an announcement in the specified language.
 
     下载指定语言的公告 PDF 文件。
 
     Args:
-        announcement_id: UUID of the announcement. / 公告的 UUID。
-        language: Preferred file language (en/zh/cn). / 首选文件语言。
-        db: Async database session (injected). / 异步数据库会话（自动注入）。
+    announcement_id: UUID of the announcement. / 公告的 UUID。
+    language: Preferred file language (en/zh/cn). / 首选文件语言。
+    db: Async database session (injected). / 异步数据库会话（自动注入）。
 
     Returns:
-        StreamingResponse: PDF file stream with download headers.
-                           带有下载头的 PDF 文件流。
+    StreamingResponse: PDF file stream with download headers.
+    带有下载头的 PDF 文件流。
 
     Raises:
-        HTTPException: 404 if announcement or file not found. / 公告或文件未找到时返回 404。
+    HTTPException: 404 if announcement or file not found. / 公告或文件未找到时返回 404。
 
     """
     announcement = await announcement_service.get_announcement_by_id(db, announcement_id)

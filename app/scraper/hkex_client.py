@@ -24,7 +24,7 @@ HKEX_API_ENDPOINT = "https://www1.hkexnews.hk/search/titleSearchServlet.do"
 
 class HKEXClient:
     """
-        Client for fetching announcement data from the HKEX disclosure platform.
+    Client for fetching announcement data from the HKEX disclosure platform.
 
     从港交所披露平台获取公告数据的客户端。
 
@@ -36,22 +36,22 @@ class HKEXClient:
     HKEX search requires a three-step session-based approach /
     港交所搜索需要三步基于会话的请求流程：
     1. GET search page with params to get ViewState and form action URL
-       获取搜索页面参数以提取 ViewState 和表单 action URL
+    获取搜索页面参数以提取 ViewState 和表单 action URL
     2. POST the JSF form with ViewState + date range to initialize session
-       提交 JSF 表单（含 ViewState 和日期范围）以初始化会话
+    提交 JSF 表单（含 ViewState 和日期范围）以初始化会话
     3. GET the JSON API with pagination to fetch records
-       通过分页请求 JSON API 获取记录
+    通过分页请求 JSON API 获取记录
     """
 
     def __init__(self, settings: Settings | None = None):
         """
-            Initialize the HKEX client with optional settings.
+        Initialize the HKEX client with optional settings.
 
         使用可选的配置初始化港交所客户端。
 
         Args:
-            settings: Application settings instance. Uses default Settings if None.
-                      应用配置实例。为 None 时使用默认配置。
+        settings: Application settings instance. Uses default Settings if None.
+        应用配置实例。为 None 时使用默认配置。
 
         """
         self._settings = settings or Settings()
@@ -59,7 +59,7 @@ class HKEXClient:
 
     def close(self):
         """
-            Close the underlying HTTP session and release resources.
+        Close the underlying HTTP session and release resources.
 
         关闭底层 HTTP 会话并释放资源。
         """
@@ -68,7 +68,7 @@ class HKEXClient:
 
     def __enter__(self):
         """
-            Enter context manager, returning self.
+        Enter context manager, returning self.
 
         进入上下文管理器，返回自身。
         """
@@ -76,7 +76,7 @@ class HKEXClient:
 
     def __exit__(self, *args):
         """
-            Exit context manager, closing the HTTP session.
+        Exit context manager, closing the HTTP session.
 
         退出上下文管理器，关闭 HTTP 会话。
         """
@@ -84,13 +84,13 @@ class HKEXClient:
 
     def _get_session(self) -> httpx.Client:
         """
-            Get or create the shared HTTP client session (lazy initialization).
+        Get or create the shared HTTP client session (lazy initialization).
 
         获取或创建共享的 HTTP 客户端会话（延迟初始化）。
 
         Returns:
-            httpx.Client: The configured HTTP client session.
-                          已配置的 HTTP 客户端会话。
+        httpx.Client: The configured HTTP client session.
+        已配置的 HTTP 客户端会话。
 
         """
         if self._session is None:
@@ -105,21 +105,21 @@ class HKEXClient:
 
     def get_stock_id(self, stock_code: str) -> str:
         """
-            Resolve a stock code (e.g. '00700') to its HKEX internal stock ID.
+        Resolve a stock code (e.g. '00700') to its HKEX internal stock ID.
 
         将股票代码（如 '00700'）解析为港交所内部股票 ID。
 
         Args:
-            stock_code: HKEX stock code string (e.g. '00700').
-                        港交所股票代码字符串。
+        stock_code: HKEX stock code string (e.g. '00700').
+        港交所股票代码字符串。
 
         Returns:
-            str: The internal stock ID used by HKEX APIs.
-                 港交所 API 使用的内部股票 ID。
+        str: The internal stock ID used by HKEX APIs.
+        港交所 API 使用的内部股票 ID。
 
         Raises:
-            ValueError: If the stock code cannot be resolved.
-                        当股票代码无法解析时抛出。
+        ValueError: If the stock code cannot be resolved.
+        当股票代码无法解析时抛出。
 
         """
         params = {
@@ -154,19 +154,19 @@ class HKEXClient:
         stock_code: str = "",
     ) -> list[dict[str, Any]]:
         """
-            Fetch announcements in EN and ZH, then generate SC fields, merging by DATE_TIME.
+        Fetch announcements in EN and ZH, then generate SC fields, merging by DATE_TIME.
 
         获取英文和繁体中文公告，然后生成简体中文字段，按日期时间合并。
 
         Args:
-            stock_id: HKEX internal stock ID. / 港交所内部股票 ID。
-            date_from: Start date of the search range. / 搜索范围的起始日期。
-            date_to: End date of the search range. / 搜索范围的结束日期。
-            stock_code: Stock code for tagging records. / 用于标记记录的股票代码。
+        stock_id: HKEX internal stock ID. / 港交所内部股票 ID。
+        date_from: Start date of the search range. / 搜索范围的起始日期。
+        date_to: End date of the search range. / 搜索范围的结束日期。
+        stock_code: Stock code for tagging records. / 用于标记记录的股票代码。
 
         Returns:
-            list[dict[str, Any]]: Merged trilingual announcement records.
-                                  合并后的三语公告记录列表。
+        list[dict[str, Any]]: Merged trilingual announcement records.
+        合并后的三语公告记录列表。
 
         """
         # Fetch EN records
@@ -231,20 +231,20 @@ class HKEXClient:
         lang: str = "E",
     ) -> list[dict[str, Any]]:
         """
-            Fetch all announcements for a stock within a date range, chunked by month.
+        Fetch all announcements for a stock within a date range, chunked by month.
 
         按月分块获取指定股票在日期范围内的所有公告。
 
         Args:
-            stock_id: HKEX internal stock ID. / 港交所内部股票 ID。
-            date_from: Start date of the range. / 范围起始日期。
-            date_to: End date of the range. / 范围结束日期。
-            lang: Language code ('E' for English, 'ZH' for Traditional Chinese).
-                  语言代码（'E' 为英文，'ZH' 为繁体中文）。
+        stock_id: HKEX internal stock ID. / 港交所内部股票 ID。
+        date_from: Start date of the range. / 范围起始日期。
+        date_to: End date of the range. / 范围结束日期。
+        lang: Language code ('E' for English, 'ZH' for Traditional Chinese).
+        语言代码（'E' 为英文，'ZH' 为繁体中文）。
 
         Returns:
-            list[dict[str, Any]]: All raw announcement records from HKEX.
-                                  来自港交所的所有原始公告记录。
+        list[dict[str, Any]]: All raw announcement records from HKEX.
+        来自港交所的所有原始公告记录。
 
         """
         all_records: list[dict[str, Any]] = []
@@ -282,27 +282,27 @@ class HKEXClient:
         lang: str = "E",
     ) -> list[dict[str, Any]]:
         """
-            Fetch one month chunk of announcements using the JSF session-based approach.
+        Fetch one month chunk of announcements using the JSF session-based approach.
 
         使用基于 JSF 会话的方式获取一个月内的公告数据。
 
         Performs a three-step process / 执行三步流程：
         1. GET search page to extract ViewState and form action.
-           获取搜索页面以提取 ViewState 和表单 action。
+        获取搜索页面以提取 ViewState 和表单 action。
         2. POST JSF form to set the date range on the server session.
-           提交 JSF 表单以在服务器会话上设置日期范围。
+        提交 JSF 表单以在服务器会话上设置日期范围。
         3. GET JSON API endpoint with pagination to retrieve records.
-           通过分页请求 JSON API 端点获取记录。
+        通过分页请求 JSON API 端点获取记录。
 
         Args:
-            stock_id: HKEX internal stock ID. / 港交所内部股票 ID。
-            date_from: Chunk start date. / 分块起始日期。
-            date_to: Chunk end date. / 分块结束日期。
-            lang: Language code ('E' or 'ZH'). / 语言代码。
+        stock_id: HKEX internal stock ID. / 港交所内部股票 ID。
+        date_from: Chunk start date. / 分块起始日期。
+        date_to: Chunk end date. / 分块结束日期。
+        lang: Language code ('E' or 'ZH'). / 语言代码。
 
         Returns:
-            list[dict[str, Any]]: Raw announcement records for the chunk.
-                                  该分块的原始公告记录。
+        list[dict[str, Any]]: Raw announcement records for the chunk.
+        该分块的原始公告记录。
 
         """
         session = self._get_session()
@@ -411,21 +411,21 @@ class HKEXClient:
     @staticmethod
     def _parse_single_record(raw: dict[str, Any], stock_code: str) -> dict[str, Any]:
         """
-            Parse a single raw HKEX API record into a normalized dictionary.
+        Parse a single raw HKEX API record into a normalized dictionary.
 
         将单条港交所 API 原始记录解析为标准化字典。
 
         Args:
-            raw: Raw record dict from HKEX API response.
-                 来自港交所 API 响应的原始记录字典。
-            stock_code: Stock code to tag the record with.
-                        用于标记记录的股票代码。
+        raw: Raw record dict from HKEX API response.
+        来自港交所 API 响应的原始记录字典。
+        stock_code: Stock code to tag the record with.
+        用于标记记录的股票代码。
 
         Returns:
-            dict[str, Any]: Normalized record with keys: stock_code, stock_name,
-            title, announcement_date, filing_type, short_text, long_text,
-            hkex_url, file_link, file_type, news_id.
-            标准化后的记录字典。
+        dict[str, Any]: Normalized record with keys: stock_code, stock_name,
+        title, announcement_date, filing_type, short_text, long_text,
+        hkex_url, file_link, file_type, news_id.
+        标准化后的记录字典。
 
         """
         if not raw:
@@ -481,7 +481,7 @@ class HKEXClient:
     @staticmethod
     def _fill_sc_fields(records: list[dict[str, Any]]) -> None:
         """
-            Fill Simplified Chinese (SC/CN) fields by converting from Traditional Chinese using opencc.
+        Fill Simplified Chinese (SC/CN) fields by converting from Traditional Chinese using opencc.
 
         使用 opencc 将繁体中文字段转换为简体中文字段。
 
@@ -492,12 +492,12 @@ class HKEXClient:
         filing_type_cn、short_text_cn、long_text_cn。
 
         Args:
-            records: List of merged announcement dicts with ZH fields.
-                     包含繁体中文字段的合并公告字典列表。
+        records: List of merged announcement dicts with ZH fields.
+        包含繁体中文字段的合并公告字典列表。
 
         Note:
-            If opencc is not installed, SC fields will be set to empty strings.
-            如未安装 opencc，简体中文字段将被设为空字符串。
+        If opencc is not installed, SC fields will be set to empty strings.
+        如未安装 opencc，简体中文字段将被设为空字符串。
 
         """
         try:

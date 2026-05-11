@@ -34,22 +34,22 @@ async def list_bulletins(
     db: AsyncSession = Depends(get_db),
 ):
     """
-        Query HKEX bulletins with language support and HKEX-compatible response format.
+    Query HKEX bulletins with language support and HKEX-compatible response format.
 
     查询港交所公告，支持多语言和港交所兼容的响应格式。
 
     Args:
-        symbol: Stock code(s), comma-separated (e.g. '00700,09988').
-                股票代码，逗号分隔（如 '00700,09988'）。
-        pageindex: Page number (1-based). / 页码（从 1 开始）。
-        pagesize: Items per page (max 20). / 每页条数（最大 20）。
-        language: Response language (en/zh/cn). / 响应语言。
-        sortorder: Sort direction (desc/asc). / 排序方向。
-        db: Async database session (injected). / 异步数据库会话（自动注入）。
+    symbol: Stock code(s), comma-separated (e.g. '00700,09988').
+    股票代码，逗号分隔（如 '00700,09988'）。
+    pageindex: Page number (1-based). / 页码（从 1 开始）。
+    pagesize: Items per page (max 20). / 每页条数（最大 20）。
+    language: Response language (en/zh/cn). / 响应语言。
+    sortorder: Sort direction (desc/asc). / 排序方向。
+    db: Async database session (injected). / 异步数据库会话（自动注入）。
 
     Returns:
-        BulletinListResponse: HKEX-compatible bulletin list with status metadata.
-                              港交所兼容的公告列表及状态元数据。
+    BulletinListResponse: HKEX-compatible bulletin list with status metadata.
+    港交所兼容的公告列表及状态元数据。
 
     """
     symbols = [s.strip() for s in symbol.split(",") if s.strip()]

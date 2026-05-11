@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class DownloadResult:
     """
-        Result of a single PDF download attempt.
+    Result of a single PDF download attempt.
 
     单次 PDF 下载尝试的结果。
     """
@@ -41,7 +41,7 @@ class PDFDownloader:
 
     def __init__(self, storage: StorageBackend, settings: Settings | None = None):
         """
-            Initialize the downloader with a storage backend and optional settings.
+        Initialize the downloader with a storage backend and optional settings.
 
         使用存储后端和可选配置初始化下载器。
         """
@@ -57,7 +57,7 @@ class PDFDownloader:
 
     def close(self):
         """
-            Close the HTTP client and release resources.
+        Close the HTTP client and release resources.
 
         关闭 HTTP 客户端并释放资源。
         """
@@ -65,7 +65,7 @@ class PDFDownloader:
 
     def __enter__(self):
         """
-            Enter context manager, returning self.
+        Enter context manager, returning self.
 
         进入上下文管理器，返回自身。
         """
@@ -73,7 +73,7 @@ class PDFDownloader:
 
     def __exit__(self, *args):
         """
-            Exit context manager, closing the HTTP client.
+        Exit context manager, closing the HTTP client.
 
         退出上下文管理器，关闭 HTTP 客户端。
         """
@@ -113,10 +113,10 @@ class PDFDownloader:
         tasks: list[tuple[str, str]],
     ) -> list[DownloadResult]:
         """
-            Download multiple PDFs concurrently.
+        Download multiple PDFs concurrently.
 
         Args:
-            tasks: List of (url, storage_key) tuples.
+        tasks: List of (url, storage_key) tuples.
 
         """
         results: list[DownloadResult] = []

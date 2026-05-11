@@ -13,7 +13,7 @@ from app.storage.s3 import S3Storage
 
 def create_storage_backend(settings: Settings | None = None) -> StorageBackend:
     """
-        Create a storage backend instance based on application settings.
+    Create a storage backend instance based on application settings.
 
     根据应用配置创建存储后端实例。
     """

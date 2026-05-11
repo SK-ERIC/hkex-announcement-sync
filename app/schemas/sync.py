@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 
 class SyncMode(str, Enum):
     """
-        Sync mode selector (full or incremental).
+    Sync mode selector (full or incremental).
 
     同步模式选择器（全量或增量）。
     """
@@ -23,7 +23,7 @@ class SyncMode(str, Enum):
 
 class SyncRequest(BaseModel):
     """
-        Request body for triggering a sync task.
+    Request body for triggering a sync task.
 
     触发同步任务的请求体。
     """
@@ -36,7 +36,7 @@ class SyncRequest(BaseModel):
 
 class SyncProgress(BaseModel):
     """
-        Progress counters for a running sync task.
+    Progress counters for a running sync task.
 
     正在运行的同步任务的进度计数器。
     """
@@ -49,7 +49,7 @@ class SyncProgress(BaseModel):
 
 class SyncStatusResponse(BaseModel):
     """
-        Response schema for querying sync task status.
+    Response schema for querying sync task status.
 
     查询同步任务状态的响应模式。
     """
@@ -62,7 +62,7 @@ class SyncStatusResponse(BaseModel):
 
 class SyncResult(BaseModel):
     """
-        Final result summary of a completed sync task.
+    Final result summary of a completed sync task.
 
     已完成同步任务的最终结果摘要。
     """

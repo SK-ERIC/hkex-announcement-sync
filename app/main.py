@@ -15,7 +15,7 @@ from app.utils.logging import setup_logging
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-        Manage application startup and shutdown lifecycle.
+    Manage application startup and shutdown lifecycle.
 
     管理应用启动和关闭生命周期。
     """
@@ -42,7 +42,7 @@ app.include_router(api_router)
 @app.get("/health")
 async def health_check():
     """
-        Health check endpoint returning service status.
+    Health check endpoint returning service status.
 
     健康检查端点，返回服务状态。
     """
