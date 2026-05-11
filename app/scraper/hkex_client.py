@@ -3,49 +3,82 @@ import logging
 import re
 import time
 from datetime import date, datetime, timedelta
-from pathlib import Path
 from typing import Any
 
 import httpx
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.config import Settings
 
 logger = logging.getLogger(__name__)
 
-MOCK_DATA_PATH = Path(__file__).parent.parent.parent / "tests" / "mock_hkex_response.json"
 HKEX_BASE_URL = "https://www1.hkexnews.hk"
 HKEX_SEARCH_PAGE = "https://www1.hkexnews.hk/search/titlesearch.xhtml"
 HKEX_API_ENDPOINT = "https://www1.hkexnews.hk/search/titleSearchServlet.do"
 
 
 class HKEXClient:
-    """Client for fetching announcement data from HKEX disclosure platform.
+    """Client for fetching announcement data from the HKEX disclosure platform.
 
-    HKEX search requires a three-step session-based approach:
+    从港交所披露平台获取公告数据的客户端。
+
+    Fetches announcements in three languages / 支持三种语言的公告获取：
+    - EN (English): lang=E
+    - ZH (Traditional Chinese / 繁体中文): lang=ZH
+    - SC (Simplified Chinese / 简体中文): converted from ZH via opencc
+
+    HKEX search requires a three-step session-based approach /
+    港交所搜索需要三步基于会话的请求流程：
     1. GET search page with params to get ViewState and form action URL
+       获取搜索页面参数以提取 ViewState 和表单 action URL
     2. POST the JSF form with ViewState + date range to initialize session
+       提交 JSF 表单（含 ViewState 和日期范围）以初始化会话
     3. GET the JSON API with pagination to fetch records
-
-    Reference: https://github.com/simonplmak-cloud/hkex-filing-scraper
+       通过分页请求 JSON API 获取记录
     """
 
-    def __init__(self, settings: Settings | None = None, mock: bool = False):
+    def __init__(self, settings: Settings | None = None):
+        """Initialize the HKEX client with optional settings.
+
+        使用可选的配置初始化港交所客户端。
+
+        Args:
+            settings: Application settings instance. Uses default Settings if None.
+                      应用配置实例。为 None 时使用默认配置。
+        """
         self._settings = settings or Settings()
-        self._mock = mock
         self._session: httpx.Client | None = None
 
     def close(self):
+        """Close the underlying HTTP session and release resources.
+
+        关闭底层 HTTP 会话并释放资源。
+        """
         if self._session:
             self._session.close()
 
     def __enter__(self):
+        """Enter context manager, returning self.
+
+        进入上下文管理器，返回自身。
+        """
         return self
 
     def __exit__(self, *args):
+        """Exit context manager, closing the HTTP session.
+
+        退出上下文管理器，关闭 HTTP 会话。
+        """
         self.close()
 
     def _get_session(self) -> httpx.Client:
+        """Get or create the shared HTTP client session (lazy initialization).
+
+        获取或创建共享的 HTTP 客户端会话（延迟初始化）。
+
+        Returns:
+            httpx.Client: The configured HTTP client session.
+                          已配置的 HTTP 客户端会话。
+        """
         if self._session is None:
             self._session = httpx.Client(
                 timeout=self._settings.HTTP_TIMEOUT,
@@ -57,11 +90,22 @@ class HKEXClient:
         return self._session
 
     def get_stock_id(self, stock_code: str) -> str:
-        """Resolve stock code (e.g. '00700') to HKEX internal stock ID."""
-        if self._mock:
-            logger.info("Mock mode: returning stock_id=7609 for %s", stock_code)
-            return "7609"
+        """Resolve a stock code (e.g. '00700') to its HKEX internal stock ID.
 
+        将股票代码（如 '00700'）解析为港交所内部股票 ID。
+
+        Args:
+            stock_code: HKEX stock code string (e.g. '00700').
+                        港交所股票代码字符串。
+
+        Returns:
+            str: The internal stock ID used by HKEX APIs.
+                 港交所 API 使用的内部股票 ID。
+
+        Raises:
+            ValueError: If the stock code cannot be resolved.
+                        当股票代码无法解析时抛出。
+        """
         params = {
             "callback": "callback",
             "lang": "EN",
@@ -91,11 +135,98 @@ class HKEXClient:
         stock_id: str,
         date_from: date,
         date_to: date,
+        stock_code: str = "",
     ) -> list[dict[str, Any]]:
-        """Fetch all announcements for a stock within a date range."""
-        if self._mock:
-            return self._mock_search()
+        """Fetch announcements in EN and ZH, then generate SC fields, merging by DATE_TIME.
 
+        获取英文和繁体中文公告，然后生成简体中文字段，按日期时间合并。
+
+        Args:
+            stock_id: HKEX internal stock ID. / 港交所内部股票 ID。
+            date_from: Start date of the search range. / 搜索范围的起始日期。
+            date_to: End date of the search range. / 搜索范围的结束日期。
+            stock_code: Stock code for tagging records. / 用于标记记录的股票代码。
+
+        Returns:
+            list[dict[str, Any]]: Merged trilingual announcement records.
+                                  合并后的三语公告记录列表。
+        """
+        # Fetch EN records
+        logger.info("Fetching EN announcements for stock_id=%s", stock_id)
+        en_records = self._fetch_all_chunks(stock_id, date_from, date_to, lang="E")
+        logger.info("Fetched %d EN records", len(en_records))
+
+        # Fetch ZH records
+        logger.info("Fetching ZH announcements for stock_id=%s", stock_id)
+        zh_records = self._fetch_all_chunks(stock_id, date_from, date_to, lang="ZH")
+        logger.info("Fetched %d ZH records", len(zh_records))
+
+        # Build ZH lookup by DATE_TIME (EN and ZH use different NEWS_IDs,
+        # but the same announcement shares the same DATE_TIME)
+        zh_by_datetime: dict[str, dict] = {}
+        for r in zh_records:
+            dt = r.get("DATE_TIME", "").strip()
+            if dt:
+                zh_by_datetime[dt] = r
+
+        # Merge EN + ZH into unified records
+        merged = []
+        for en_raw in en_records:
+            news_id = en_raw.get("NEWS_ID", "")
+            en_dt = en_raw.get("DATE_TIME", "").strip()
+            zh_raw = zh_by_datetime.get(en_dt, {})
+
+            en_parsed = self._parse_single_record(en_raw, stock_code)
+            zh_parsed = self._parse_single_record(zh_raw, stock_code) if zh_raw else {}
+
+            record = {
+                "stock_code": en_parsed["stock_code"],
+                "news_id": news_id,
+                "title_en": en_parsed.get("title", ""),
+                "title_zh": zh_parsed.get("title", ""),
+                "stock_name_en": en_parsed.get("stock_name", ""),
+                "stock_name_zh": zh_parsed.get("stock_name", ""),
+                "filing_type_en": en_parsed.get("filing_type", ""),
+                "filing_type_zh": zh_parsed.get("filing_type", ""),
+                "short_text_en": en_parsed.get("short_text", ""),
+                "short_text_zh": zh_parsed.get("short_text", ""),
+                "long_text_en": en_parsed.get("long_text", ""),
+                "long_text_zh": zh_parsed.get("long_text", ""),
+                "hkex_url_en": en_parsed.get("hkex_url", ""),
+                "hkex_url_zh": zh_parsed.get("hkex_url", ""),
+                "file_type": en_parsed.get("file_type", "PDF"),
+                "announcement_date": en_parsed.get("announcement_date"),
+            }
+            merged.append(record)
+
+        # Generate SC fields using opencc
+        self._fill_sc_fields(merged)
+
+        logger.info("Merged %d trilingual records", len(merged))
+        return merged
+
+    def _fetch_all_chunks(
+        self,
+        stock_id: str,
+        date_from: date,
+        date_to: date,
+        lang: str = "E",
+    ) -> list[dict[str, Any]]:
+        """Fetch all announcements for a stock within a date range, chunked by month.
+
+        按月分块获取指定股票在日期范围内的所有公告。
+
+        Args:
+            stock_id: HKEX internal stock ID. / 港交所内部股票 ID。
+            date_from: Start date of the range. / 范围起始日期。
+            date_to: End date of the range. / 范围结束日期。
+            lang: Language code ('E' for English, 'ZH' for Traditional Chinese).
+                  语言代码（'E' 为英文，'ZH' 为繁体中文）。
+
+        Returns:
+            list[dict[str, Any]]: All raw announcement records from HKEX.
+                                  来自港交所的所有原始公告记录。
+        """
         all_records: list[dict[str, Any]] = []
 
         chunk_start = date_from
@@ -107,10 +238,10 @@ class HKEXClient:
             chunk_end = min(next_month - timedelta(days=1), date_to)
 
             logger.info(
-                "Fetching: stock_id=%s, %s to %s",
-                stock_id, chunk_start, chunk_end,
+                "Fetching lang=%s: stock_id=%s, %s to %s",
+                lang, stock_id, chunk_start, chunk_end,
             )
-            records = self._fetch_chunk(stock_id, chunk_start, chunk_end)
+            records = self._fetch_chunk(stock_id, chunk_start, chunk_end, lang=lang)
             all_records.extend(records)
 
             if chunk_start.month == 12:
@@ -118,25 +249,37 @@ class HKEXClient:
             else:
                 chunk_start = date(chunk_start.year, chunk_start.month + 1, 1)
 
-        logger.info("Total announcements fetched: %d", len(all_records))
         return all_records
-
-    def _mock_search(self) -> list[dict[str, Any]]:
-        if not MOCK_DATA_PATH.exists():
-            logger.warning("Mock data file not found: %s", MOCK_DATA_PATH)
-            return []
-        with open(MOCK_DATA_PATH) as f:
-            records = json.load(f)
-        logger.info("Mock mode: returning %d records", len(records))
-        return records
 
     def _fetch_chunk(
         self,
         stock_id: str,
         date_from: date,
         date_to: date,
+        lang: str = "E",
     ) -> list[dict[str, Any]]:
-        """Fetch one month chunk using the JSF session-based approach."""
+        """Fetch one month chunk of announcements using the JSF session-based approach.
+
+        使用基于 JSF 会话的方式获取一个月内的公告数据。
+
+        Performs a three-step process / 执行三步流程：
+        1. GET search page to extract ViewState and form action.
+           获取搜索页面以提取 ViewState 和表单 action。
+        2. POST JSF form to set the date range on the server session.
+           提交 JSF 表单以在服务器会话上设置日期范围。
+        3. GET JSON API endpoint with pagination to retrieve records.
+           通过分页请求 JSON API 端点获取记录。
+
+        Args:
+            stock_id: HKEX internal stock ID. / 港交所内部股票 ID。
+            date_from: Chunk start date. / 分块起始日期。
+            date_to: Chunk end date. / 分块结束日期。
+            lang: Language code ('E' or 'ZH'). / 语言代码。
+
+        Returns:
+            list[dict[str, Any]]: Raw announcement records for the chunk.
+                                  该分块的原始公告记录。
+        """
         session = self._get_session()
         from_str = date_from.strftime("%Y%m%d")
         to_str = date_to.strftime("%Y%m%d")
@@ -208,7 +351,7 @@ class HKEXClient:
                     "t2Gcode": "-2",
                     "t2code": "-2",
                     "rowRange": str(fetched + 5000),
-                    "lang": "E",
+                    "lang": lang,
                 },
                 headers={
                     "Accept": "application/json, text/javascript, */*; q=0.01",
@@ -245,13 +388,46 @@ class HKEXClient:
         return all_records
 
     @staticmethod
-    def parse_record(raw: dict[str, Any], stock_code: str) -> dict[str, Any]:
-        """Parse a raw HKEX API record into a normalized dict."""
+    def _parse_single_record(raw: dict[str, Any], stock_code: str) -> dict[str, Any]:
+        """Parse a single raw HKEX API record into a normalized dictionary.
+
+        将单条港交所 API 原始记录解析为标准化字典。
+
+        Args:
+            raw: Raw record dict from HKEX API response.
+                 来自港交所 API 响应的原始记录字典。
+            stock_code: Stock code to tag the record with.
+                        用于标记记录的股票代码。
+
+        Returns:
+            dict[str, Any]: Normalized record with keys: stock_code, stock_name,
+            title, announcement_date, filing_type, short_text, long_text,
+            hkex_url, file_link, file_type, news_id.
+            标准化后的记录字典。
+        """
+        if not raw:
+            return {
+                "stock_code": stock_code,
+                "stock_name": "",
+                "title": "",
+                "announcement_date": None,
+                "filing_type": "",
+                "short_text": "",
+                "long_text": "",
+                "hkex_url": "",
+                "file_link": "",
+                "file_type": "PDF",
+                "news_id": "",
+            }
+
         file_link = raw.get("FILE_LINK", "")
         title = raw.get("TITLE", "")
         stock_name = raw.get("STOCK_NAME", "").replace("<br/>", " ").strip()
         filing_type = raw.get("LONG_TEXT", raw.get("SHORT_TEXT", ""))
         news_id = raw.get("NEWS_ID", "")
+        short_text = raw.get("SHORT_TEXT", "")
+        long_text = raw.get("LONG_TEXT", "")
+        file_type = raw.get("FILE_TYPE", "PDF")
 
         date_str = raw.get("DATE_TIME", "")
         announcement_date = None
@@ -271,7 +447,50 @@ class HKEXClient:
             "title": title,
             "announcement_date": announcement_date,
             "filing_type": filing_type,
+            "short_text": short_text,
+            "long_text": long_text,
             "hkex_url": hkex_url,
             "file_link": file_link,
+            "file_type": file_type,
             "news_id": news_id,
         }
+
+    @staticmethod
+    def _fill_sc_fields(records: list[dict[str, Any]]) -> None:
+        """Fill Simplified Chinese (SC/CN) fields by converting from Traditional Chinese using opencc.
+
+        使用 opencc 将繁体中文字段转换为简体中文字段。
+
+        Modifies records in-place, adding keys: title_cn, stock_name_cn,
+        filing_type_cn, short_text_cn, long_text_cn.
+
+        就地修改记录，添加以下键：title_cn、stock_name_cn、
+        filing_type_cn、short_text_cn、long_text_cn。
+
+        Args:
+            records: List of merged announcement dicts with ZH fields.
+                     包含繁体中文字段的合并公告字典列表。
+
+        Note:
+            If opencc is not installed, SC fields will be set to empty strings.
+            如未安装 opencc，简体中文字段将被设为空字符串。
+        """
+        try:
+            import opencc
+            converter = opencc.OpenCC("t2s")
+        except Exception:
+            logger.warning("opencc not available, SC fields will be empty")
+            for r in records:
+                r["title_cn"] = ""
+                r["stock_name_cn"] = ""
+                r["filing_type_cn"] = ""
+                r["short_text_cn"] = ""
+                r["long_text_cn"] = ""
+            return
+
+        for r in records:
+            r["title_cn"] = converter.convert(r.get("title_zh", ""))
+            r["stock_name_cn"] = converter.convert(r.get("stock_name_zh", ""))
+            r["filing_type_cn"] = converter.convert(r.get("filing_type_zh", "") or "")
+            r["short_text_cn"] = converter.convert(r.get("short_text_zh", "") or "")
+            r["long_text_cn"] = converter.convert(r.get("long_text_zh", "") or "")
