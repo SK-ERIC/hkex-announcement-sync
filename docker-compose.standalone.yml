@@ -1,0 +1,28 @@
+# Standalone mode — SQLite + single process, no Redis/Celery/MySQL needed.
+# Usage: docker compose -f docker-compose.standalone.yml up -d
+#
+# Sync tasks run in-process (no background worker).
+# Data is stored in the ./data directory (SQLite DB + PDF files).
+
+services:
+  api:
+    build: .
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///./data/hkex_sync.db
+      - CELERY_ENABLED=false
+      - STORAGE_BACKEND=local
+      - STORAGE_LOCAL_PATH=/app/data/pdfs
+      - SYNC_STOCK_CODES=${SYNC_STOCK_CODES:-00700,09988}
+      - DEFAULT_LANGUAGE=${DEFAULT_LANGUAGE:-en}
+    volumes:
+      - app_data:/app/data
+
+volumes:
+  app_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data
