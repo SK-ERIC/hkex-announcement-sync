@@ -5,11 +5,17 @@ FastAPI 应用入口，包含生命周期管理。
 """
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.router import api_router
 from app.utils.logging import setup_logging
+
+STATIC_DIR = Path(__file__).parent / "static"
 
 
 @asynccontextmanager
@@ -21,7 +27,6 @@ async def lifespan(app: FastAPI):
     """
     setup_logging()
 
-    # Auto-create SQLite tables on startup (dev mode)
     from app.database import init_db
 
     await init_db()
@@ -36,6 +41,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(api_router)
 
 
@@ -47,3 +59,12 @@ async def health_check():
     健康检查端点，返回服务状态。
     """
     return {"status": "ok"}
+
+
+# Serve Web UI
+if STATIC_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+    @app.get("/")
+    async def serve_index():
+        return FileResponse(STATIC_DIR / "index.html")

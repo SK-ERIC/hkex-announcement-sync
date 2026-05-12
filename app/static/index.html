@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HKEX Announcement Sync</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <div class="container header-inner">
+      <h1>HKEX Announcement Sync</h1>
+      <div class="header-actions">
+        <div class="lang-switch">
+          <button data-lang="en" class="active">EN</button>
+          <button data-lang="zh">繁</button>
+          <button data-lang="cn">简</button>
+        </div>
+        <div class="sync-input">
+          <input type="text" id="sync-codes" placeholder="Stock codes, e.g. 00700,09988" />
+          <select id="sync-mode">
+            <option value="incremental">Incremental</option>
+            <option value="full">Full</option>
+          </select>
+          <button id="sync-btn" class="btn btn-primary">Sync Now</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <div id="sync-summary" class="sync-summary hidden">
+      <div class="summary-item">
+        <span class="summary-label">Last Sync</span>
+        <span id="summary-time" class="summary-value">--</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Status</span>
+        <span id="summary-status" class="summary-value">--</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">New</span>
+        <span id="summary-synced" class="summary-value">--</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Total</span>
+        <span id="summary-total" class="summary-value">--</span>
+      </div>
+    </div>
+
+    <section class="filters">
+      <div class="filter-group">
+        <label for="stock-code">Stock Code</label>
+        <input type="text" id="stock-code" placeholder="e.g. 00700" />
+      </div>
+      <div class="filter-group">
+        <label for="date-from">From</label>
+        <input type="date" id="date-from" />
+      </div>
+      <div class="filter-group">
+        <label for="date-to">To</label>
+        <input type="date" id="date-to" />
+      </div>
+      <div class="filter-group filter-action">
+        <button id="search-btn" class="btn btn-secondary">Search</button>
+      </div>
+    </section>
+
+    <div id="sync-status" class="sync-status hidden"></div>
+
+    <div id="announcement-list">
+      <div class="empty-state">
+        <p>No announcements yet. Click <strong>Sync Now</strong> to fetch data from HKEX.</p>
+      </div>
+    </div>
+
+    <div id="pagination" class="pagination hidden">
+      <button id="prev-btn" class="btn btn-sm" disabled>&larr; Previous</button>
+      <span id="page-info"></span>
+      <button id="next-btn" class="btn btn-sm">Next &rarr;</button>
+    </div>
+  </main>
+
+  <div id="modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <button class="modal-close">&times;</button>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
