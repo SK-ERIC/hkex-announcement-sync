@@ -22,17 +22,43 @@
 - **REST API 接口** -- 分页列表、详情、公告查询、PDF 下载等接口，供官网后台集成调用
 - **三重数据库支持** -- SQLite（默认）、MySQL、PostgreSQL，可通过配置切换
 - **双存储支持** -- 本地文件系统或 S3 兼容存储（阿里云 OSS、MinIO、AWS S3 等）
-- **Docker Compose 部署** -- 一键启动 API、Celery Worker、Celery Beat、MySQL、Redis
+- **Web UI** -- 内置公告浏览界面，支持搜索、分页和语言切换
+- **Docker Compose 部署** -- 单容器独立模式或五服务生产模式
 
 ## 快速开始
 
-### 环境要求
+### 方式一：Docker 独立模式（推荐）
 
-- [Python 3.12+](https://www.python.org/)（通过 [mise](https://mise.jdx.dev/) 或系统安装）
-- [uv](https://docs.astral.sh/uv/) 包管理器
-- [Docker](https://www.docker.com/) 和 Docker Compose（可选，生产部署时需要）
+最快上手方式 -- 单个容器，无需任何外部依赖。
 
-### 方式一：本地开发（零配置）
+```bash
+# 克隆仓库
+git clone https://github.com/SK-ERIC/hkex-announcement-sync.git
+cd hkex-announcement-sync
+
+# 创建数据目录
+mkdir -p data
+
+# （可选）自定义股票代码和默认语言
+# 创建 .env 文件：
+# SYNC_STOCK_CODES=00700,09988
+# DEFAULT_LANGUAGE=zh
+
+# 启动服务
+docker compose -f docker-compose.standalone.yml up -d
+```
+
+访问 `http://localhost:8000` 打开 Web UI，或访问 `http://localhost:8000/docs` 查看 API 文档。
+
+**环境变量：**
+
+| 变量                 | 默认值               | 说明                                       |
+|----------------------|----------------------|--------------------------------------------|
+| `SYNC_STOCK_CODES`   | `00700,09988`        | 逗号分隔的股票代码                          |
+| `DEFAULT_LANGUAGE`   | `en`                 | 默认 UI/API 语言（`en`、`zh` 或 `cn`）     |
+| `PORT`               | `8000`               | 暴露到宿主机的端口                          |
+
+### 方式二：本地开发（零配置）
 
 无需 MySQL、Redis 或任何外部服务，只需 Python。
 
@@ -47,7 +73,7 @@ cp .env.example .env
 uvicorn app.main:app --reload
 ```
 
-启动后访问 `http://localhost:8000/docs` 查看 Swagger 交互式 API 文档。
+访问 `http://localhost:8000` 打开 Web UI，或访问 `http://localhost:8000/docs` 查看 Swagger API 文档。
 
 **触发首次同步：**
 
@@ -57,11 +83,13 @@ curl -X POST http://localhost:8000/api/sync \
   -d '{"stock_codes": ["00700"], "mode": "incremental"}'
 ```
 
-### 方式二：Docker Compose（生产部署）
+或者在 Web UI 中点击 **Sync Now** 按钮。
+
+### 方式三：Docker Compose（生产部署）
 
 ```bash
 # 克隆仓库
-git clone https://github.com/YOUR_USERNAME/hkex-announcement-sync.git
+git clone https://github.com/SK-ERIC/hkex-announcement-sync.git
 cd hkex-announcement-sync
 
 # 复制并编辑配置
@@ -171,11 +199,16 @@ hkex-announcement-sync/
 |   |   +-- __init__.py
 |   |   +-- celery_app.py           # Celery 实例与 Beat 调度配置
 |   |   +-- sync_tasks.py           # 同步 Celery 任务
+|   +-- static/
+|   |   +-- index.html              # Web UI 入口
+|   |   +-- style.css               # Web UI 样式
+|   |   +-- app.js                  # Web UI 逻辑
 |   +-- utils/
 |       +-- __init__.py
 |       +-- logging.py              # 日志配置
 +-- migrations/                     # Alembic 数据库迁移脚本
-+-- docker-compose.yml
++-- docker-compose.yml              # 生产部署（5 个服务）
++-- docker-compose.standalone.yml   # 独立部署（单容器）
 +-- Dockerfile
 +-- pyproject.toml
 +-- alembic.ini

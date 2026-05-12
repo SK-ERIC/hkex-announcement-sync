@@ -22,17 +22,43 @@ A standalone backend data synchronization service that automatically fetches all
 - **REST API** -- Paginated list, detail, bulletin query, and PDF download endpoints for website backend integration
 - **Triple Database Support** -- SQLite (default), MySQL, and PostgreSQL, switchable via config
 - **Dual Storage Support** -- Local filesystem or S3-compatible storage (Aliyun OSS, MinIO, AWS S3, etc.)
-- **Docker Compose Deployment** -- One command to start API, Celery worker, Celery beat, MySQL, and Redis
+- **Web UI** -- Built-in announcement browsing interface with search, pagination, and language switching
+- **Docker Compose Deployment** -- Standalone mode (single container) or production mode (5 services)
 
 ## Quick Start
 
-### Prerequisites
+### Option 1: Docker Standalone (Recommended)
 
-- [Python 3.12+](https://www.python.org/) (managed via [mise](https://mise.jdx.dev/) or system)
-- [uv](https://docs.astral.sh/uv/) package manager
-- [Docker](https://www.docker.com/) & Docker Compose (optional, for production deployment)
+The fastest way to get started -- single container, no external dependencies.
 
-### Option 1: Local Development (Zero Config)
+```bash
+# Clone the repository
+git clone https://github.com/SK-ERIC/hkex-announcement-sync.git
+cd hkex-announcement-sync
+
+# Create data directory
+mkdir -p data
+
+# (Optional) Customize stock codes and default language
+# Create a .env file:
+# SYNC_STOCK_CODES=00700,09988
+# DEFAULT_LANGUAGE=en
+
+# Start the service
+docker compose -f docker-compose.standalone.yml up -d
+```
+
+Visit `http://localhost:8000` for the Web UI, or `http://localhost:8000/docs` for the API docs.
+
+**Environment variables:**
+
+| Variable             | Default                | Description                                    |
+|----------------------|------------------------|------------------------------------------------|
+| `SYNC_STOCK_CODES`   | `00700,09988`          | Comma-separated stock codes to sync            |
+| `DEFAULT_LANGUAGE`   | `en`                   | Default UI/API language (`en`, `zh`, or `cn`)  |
+| `PORT`               | `8000`                 | Host port to expose                            |
+
+### Option 2: Local Development (Zero Config)
 
 No MySQL, Redis, or external services needed. Just Python.
 
@@ -47,7 +73,7 @@ cp .env.example .env
 uvicorn app.main:app --reload
 ```
 
-Visit `http://localhost:8000/docs` for the interactive Swagger API documentation.
+Visit `http://localhost:8000` for the Web UI, or `http://localhost:8000/docs` for the interactive Swagger API documentation.
 
 **Trigger your first sync:**
 
@@ -57,11 +83,13 @@ curl -X POST http://localhost:8000/api/sync \
   -d '{"stock_codes": ["00700"], "mode": "incremental"}'
 ```
 
-### Option 2: Docker Compose (Production)
+Or click **Sync Now** in the Web UI.
+
+### Option 3: Docker Compose (Production)
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/hkex-announcement-sync.git
+git clone https://github.com/SK-ERIC/hkex-announcement-sync.git
 cd hkex-announcement-sync
 
 # Copy and edit configuration
@@ -171,11 +199,16 @@ hkex-announcement-sync/
 |   |   +-- __init__.py
 |   |   +-- celery_app.py           # Celery instance & Beat schedule
 |   |   +-- sync_tasks.py           # Sync Celery tasks
+|   +-- static/
+|   |   +-- index.html              # Web UI entry
+|   |   +-- style.css               # Web UI styles
+|   |   +-- app.js                  # Web UI logic
 |   +-- utils/
 |       +-- __init__.py
 |       +-- logging.py              # Logging setup
 +-- migrations/                     # Alembic migration scripts
-+-- docker-compose.yml
++-- docker-compose.yml              # Production deployment (5 services)
++-- docker-compose.standalone.yml   # Standalone deployment (single container)
 +-- Dockerfile
 +-- pyproject.toml
 +-- alembic.ini
