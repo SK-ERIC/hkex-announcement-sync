@@ -109,6 +109,15 @@ class Settings(BaseSettings):
     PAGE_SIZE_MAX: int = 100
     DEFAULT_LANGUAGE: str = "en"
 
+    # Notification
+    NOTIFIER_ENABLED: bool = False
+    NOTIFIER_TYPE: str = ""  # feishu (Lark), wecom (WeChat Work), dingtalk
+    NOTIFIER_FEISHU_WEBHOOK: str = ""
+    NOTIFIER_FEISHU_SECRET: str = ""
+    NOTIFIER_ON_SYNC: bool = True
+    NOTIFIER_ON_NEW: bool = True
+    SITE_URL: str = "http://localhost:8000"
+
     @computed_field
     @property
     def stock_codes(self) -> list[str]:

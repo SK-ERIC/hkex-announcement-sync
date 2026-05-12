@@ -207,6 +207,17 @@ class SyncService:
         await announcement_service.bulk_insert_announcements(self._db, db_records)
         await self._db.commit()
 
+        # Send new announcements notification
+        if self._settings.NOTIFIER_ENABLED and self._settings.NOTIFIER_ON_NEW:
+            try:
+                from app.notifiers.factory import create_notifier
+
+                notifier = create_notifier(self._settings)
+                if notifier:
+                    notifier.send_new_announcements(new_records, stock_code)
+            except Exception:
+                logger.exception("Failed to send new announcement notification")
+
         # Re-fetch inserted records to get their IDs for PDF download
         inserted_news_ids = [r["news_id"] for r in db_records]
         from sqlalchemy import select
