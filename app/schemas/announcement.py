@@ -72,6 +72,7 @@ class AnnouncementResponse(BaseModel):
     announcement_date: datetime | None = None
     source: str
     is_visible: bool = True
+    status: str = "active"
     download_url: str | None = None
     created_at: datetime
     updated_at: datetime
@@ -113,6 +114,7 @@ class AnnouncementListParams(BaseModel):
     stock_code: str | None = None
     date_from: date | None = None
     date_to: date | None = None
+    status: str | None = None
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)
     language: LanguageEnum = LanguageEnum.en

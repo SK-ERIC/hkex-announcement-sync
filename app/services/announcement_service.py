@@ -41,6 +41,8 @@ async def get_announcements(
         query = query.where(Announcement.announcement_date >= params.date_from)
     if params.date_to:
         query = query.where(Announcement.announcement_date <= params.date_to)
+    if getattr(params, "status", None):
+        query = query.where(Announcement.status == params.status)
 
     count_query = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_query)).scalar() or 0
@@ -184,3 +186,71 @@ async def update_announcement_file(
         announcement.file_hash = file_hash
         announcement.last_synced_at = datetime.utcnow()
         await db.flush()
+
+
+async def get_announcements_by_news_ids(
+    db: AsyncSession,
+    stock_code: str,
+    news_ids: list[str],
+) -> dict[str, Announcement]:
+    """
+    Get announcements keyed by news_id for reconciliation.
+
+    获取按 news_id 索引的公告，用于对账。
+
+    Args:
+    db: Async database session. / 异步数据库会话。
+    stock_code: Stock code to filter by. / 用于过滤的股票代码。
+    news_ids: List of news_id strings to look up. / 要查找的 news_id 列表。
+
+    Returns:
+    dict[str, Announcement]: Mapping of news_id -> Announcement.
+
+    """
+    if not news_ids:
+        return {}
+    result = await db.execute(
+        select(Announcement).where(
+            Announcement.stock_code == stock_code,
+            Announcement.news_id.in_(news_ids),
+        )
+    )
+    return {ann.news_id: ann for ann in result.scalars().all()}
+
+
+async def bulk_update_status(
+    db: AsyncSession,
+    updates: list[dict],
+) -> int:
+    """
+    Bulk update status and filing_type for announcements identified by news_id.
+
+    按 news_id 批量更新公告状态和 filing_type。
+
+    Args:
+    db: Async database session. / 异步数据库会话。
+    updates: List of dicts with keys: news_id, status, and optionally filing_type_en/zh/cn.
+
+    Returns:
+    int: Number of records actually updated.
+
+    """
+    if not updates:
+        return 0
+    count = 0
+    for upd in updates:
+        result = await db.execute(
+            select(Announcement).where(Announcement.news_id == upd["news_id"])
+        )
+        ann = result.scalar_one_or_none()
+        if ann and ann.status != upd["status"]:
+            ann.status = upd["status"]
+            if "filing_type_en" in upd:
+                ann.filing_type_en = upd["filing_type_en"]
+            if "filing_type_zh" in upd:
+                ann.filing_type_zh = upd["filing_type_zh"]
+            if "filing_type_cn" in upd:
+                ann.filing_type_cn = upd["filing_type_cn"]
+            count += 1
+    await db.flush()
+    return count

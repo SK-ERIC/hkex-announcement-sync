@@ -200,6 +200,7 @@ class SyncService:
                     "file_type": r.get("file_type", "PDF"),
                     "announcement_date": r.get("announcement_date"),
                     "source": "auto",
+                    "status": r.get("status", "active"),
                     "last_synced_at": datetime.utcnow(),
                 }
             )

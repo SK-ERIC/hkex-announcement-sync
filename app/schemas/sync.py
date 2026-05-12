@@ -113,3 +113,17 @@ class SyncSummaryResponse(BaseModel):
     last_sync_failed: int = 0
     total_syncs: int = 0
     total_announcements: int = 0
+
+
+class ReconcileRequest(BaseModel):
+    """
+    Request body for triggering a reconciliation operation.
+
+    触发对账操作的请求体。
+
+    """
+
+    stock_codes: list[str] | None = None
+    date_from: date | None = None
+    date_to: date | None = None
+    days_back: int = 30

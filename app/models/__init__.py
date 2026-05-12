@@ -39,6 +39,26 @@ class SourceType(str, PyEnum):
     MANUAL = "manual"
 
 
+class AnnouncementStatus(str, PyEnum):
+    """
+    HKEX announcement lifecycle status.
+
+    港交所公告生命周期状态枚举。
+
+    Attributes:
+    ACTIVE: Normal active announcement. / 正常公告。
+    CANCELLED_SUPERSEDED: Replaced by a newer announcement. / 被新公告取代。
+    CANCELLED_REISSUED: Withdrawn and corrected version re-published. / 撤回后重新发布。
+    HEADLINES_REVISED: Headline was revised. / 标题被修订。
+
+    """
+
+    ACTIVE = "active"
+    CANCELLED_SUPERSEDED = "cancelled_superseded"
+    CANCELLED_REISSUED = "cancelled_reissued"
+    HEADLINES_REVISED = "headlines_revised"
+
+
 class Announcement(Base):
     """
     ORM model representing an HKEX announcement with multilingual fields.
@@ -117,6 +137,9 @@ class Announcement(Base):
 
     source: Mapped[SourceType] = mapped_column(Enum(SourceType), nullable=False, default=SourceType.AUTO)
     is_visible: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    status: Mapped[str] = mapped_column(
+        String(30), nullable=False, default="active", server_default="active", index=True
+    )
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

@@ -22,6 +22,12 @@ HKEX_BASE_URL = "https://www1.hkexnews.hk"
 HKEX_SEARCH_PAGE = "https://www1.hkexnews.hk/search/titlesearch.xhtml"
 HKEX_API_ENDPOINT = "https://www1.hkexnews.hk/search/titleSearchServlet.do"
 
+CANCELLATION_PATTERNS: list[tuple[re.Pattern, str]] = [
+    (re.compile(r"\(Cancelled since Headlines Superseded and Replaced\)"), "cancelled_superseded"),
+    (re.compile(r"\(Cancelled and Reissued\)"), "cancelled_reissued"),
+    (re.compile(r"\(Headlines Revised\)"), "headlines_revised"),
+]
+
 
 class HKEXClient:
     """
@@ -215,6 +221,7 @@ class HKEXClient:
                 "hkex_url_zh": zh_parsed.get("hkex_url", ""),
                 "file_type": en_parsed.get("file_type", "PDF"),
                 "announcement_date": en_parsed.get("announcement_date"),
+                "status": en_parsed.get("status", "active"),
             }
             merged.append(record)
 
@@ -430,6 +437,28 @@ class HKEXClient:
         return " ".join(text.split())
 
     @staticmethod
+    def _parse_cancellation_tag(long_text: str) -> tuple[str, str]:
+        """
+        Extract cancellation status tag from LONG_TEXT, returning (status, clean_filing_type).
+
+        从 LONG_TEXT 中提取取消状态标记，返回 (status, clean_filing_type)。
+
+        HKEX prefixes cancelled announcements with tags like:
+        "(Cancelled since Headlines Superseded and Replaced)", "(Cancelled and Reissued)", etc.
+
+        Returns:
+        tuple[str, str]: (status_string, filing_type_with_tag_removed)
+        Status is one of: "active", "cancelled_superseded", "cancelled_reissued", "headlines_revised".
+
+        """
+        if not long_text:
+            return "active", ""
+        for pattern, status in CANCELLATION_PATTERNS:
+            if pattern.search(long_text):
+                return status, pattern.sub("", long_text).strip()
+        return "active", long_text
+
+    @staticmethod
     def _parse_single_record(raw: dict[str, Any], stock_code: str) -> dict[str, Any]:
         """
         Parse a single raw HKEX API record into a normalized dictionary.
@@ -462,15 +491,19 @@ class HKEXClient:
                 "file_link": "",
                 "file_type": "PDF",
                 "news_id": "",
+                "status": "active",
             }
 
         file_link = raw.get("FILE_LINK", "")
         title = HKEXClient._clean_text(raw.get("TITLE", ""))
         stock_name = HKEXClient._clean_text(raw.get("STOCK_NAME", ""))
-        filing_type = HKEXClient._clean_text(raw.get("LONG_TEXT", raw.get("SHORT_TEXT", "")))
+        long_text_raw = HKEXClient._clean_text(raw.get("LONG_TEXT", ""))
+        status, filing_type = HKEXClient._parse_cancellation_tag(long_text_raw)
+        if not filing_type:
+            filing_type = HKEXClient._clean_text(raw.get("SHORT_TEXT", ""))
         news_id = raw.get("NEWS_ID", "")
         short_text = HKEXClient._clean_text(raw.get("SHORT_TEXT", ""))
-        long_text = HKEXClient._clean_text(raw.get("LONG_TEXT", ""))
+        long_text = long_text_raw
         file_type = raw.get("FILE_TYPE", "PDF")
 
         date_str = raw.get("DATE_TIME", "")
@@ -497,6 +530,7 @@ class HKEXClient:
             "file_link": file_link,
             "file_type": file_type,
             "news_id": news_id,
+            "status": status,
         }
 
     @staticmethod
