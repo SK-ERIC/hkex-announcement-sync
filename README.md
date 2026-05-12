@@ -16,8 +16,10 @@ A standalone backend data synchronization service that automatically fetches all
 - **Concurrent PDF Download** -- Download announcement PDFs (both EN and ZH versions) with configurable concurrency (default: 5 workers), with retry on failure
 - **Deduplication** -- Automatically skip already-synced announcements based on unique `news_id`
 - **Database Persistence** -- Store all announcement metadata in SQLite, MySQL, or PostgreSQL via SQLAlchemy ORM
-- **Scheduled Auto Sync** -- Hourly incremental sync via Celery Beat (configurable schedule)
+- **Built-in Scheduler** -- Smart polling scheduler with adaptive backoff (replaces Celery Beat for standalone mode)
 - **Manual Trigger API** -- `POST /api/sync` to trigger on-demand sync with optional stock codes and date range
+- **Concurrency Protection** -- Prevents overlapping sync tasks (returns 409 if a sync is already running)
+- **Real-time SSE Events** -- `GET /api/sync/events` streams sync completions and scheduler state to the Web UI
 - **Task Status Tracking** -- Poll `GET /api/sync/status/{task_id}` for real-time sync progress
 - **REST API** -- Paginated list, detail, bulletin query, and PDF download endpoints for website backend integration
 - **Triple Database Support** -- SQLite (default), MySQL, and PostgreSQL, switchable via config
@@ -159,6 +161,13 @@ This starts 5 services:
 | **Inline**  | `CELERY_ENABLED=false` (default) | Sync runs directly in the API process                  |
 | **Celery**  | `CELERY_ENABLED=true`           | Sync is dispatched to Celery worker via Redis          |
 
+**Scheduling options:**
+
+| Scheduler           | When                              | How                                                            |
+|---------------------|-----------------------------------|----------------------------------------------------------------|
+| **Built-in**        | `SCHEDULER_ENABLED=true`          | Asyncio background task with smart backoff (no Redis needed)   |
+| **Celery Beat**     | `CELERY_ENABLED=true`             | Classic Celery Beat cron schedule (requires Redis)             |
+
 ## Project Structure
 
 ```text
@@ -184,6 +193,7 @@ hkex-announcement-sync/
 |   +-- services/
 |   |   +-- __init__.py
 |   |   +-- sync_service.py         # Sync orchestration pipeline
+|   |   +-- scheduler.py            # Built-in smart polling scheduler
 |   |   +-- announcement_service.py # Announcement CRUD operations
 |   +-- scraper/
 |   |   +-- __init__.py
@@ -419,6 +429,37 @@ curl "http://localhost:8000/api/bulletin?symbol=00700&pageindex=1&pagesize=5&lan
 { "status": "ok" }
 ```
 
+### Sync Events (SSE)
+
+**`GET /api/sync/events`**
+
+Server-Sent Events endpoint for real-time sync status updates. The Web UI connects automatically.
+
+**Events:**
+
+| Event              | Data                                            | Description                          |
+|--------------------|-------------------------------------------------|--------------------------------------|
+| `scheduler_state`  | `{"interval": 900}`                             | Initial scheduler state on connect   |
+| `sync_complete`    | `{"task_id", "status", "synced", "duration"}`  | Fired when a sync cycle completes    |
+| `heartbeat`        | `{}`                                            | Keep-alive ping every 30 seconds     |
+
+### Scheduler Status
+
+**`GET /api/sync/scheduler-status`**
+
+**Response:**
+
+```json
+{
+  "enabled": true,
+  "running": false,
+  "base_interval": 900,
+  "current_interval": 900,
+  "smart_backoff": true,
+  "max_interval": 3600
+}
+```
+
 ## Database Schema
 
 ### `announcements` Table
@@ -559,6 +600,24 @@ SITE_URL=https://your-service-url.com
 
 Notification cards follow the `DEFAULT_LANGUAGE` setting and support interactive buttons (retry on failure, view all announcements).
 
+### Scheduler
+
+Built-in smart polling scheduler for standalone mode (no Redis/Celery needed).
+
+| Variable                         | Default | Description                                                        |
+|----------------------------------|---------|--------------------------------------------------------------------|
+| `SCHEDULER_ENABLED`              | `false` | Enable built-in scheduler                                          |
+| `SCHEDULER_INTERVAL_SECONDS`     | `900`   | Base polling interval in seconds (15 min)                          |
+| `SCHEDULER_SMART_BACKOFF`        | `true`  | Double interval when no new data is found                          |
+| `SCHEDULER_MAX_INTERVAL_SECONDS` | `3600`  | Maximum interval cap in seconds (1 hour)                           |
+
+**Smart backoff logic:**
+
+- Starts at `SCHEDULER_INTERVAL_SECONDS` (e.g., 15 min)
+- Each cycle with no new data doubles the interval
+- Caps at `SCHEDULER_MAX_INTERVAL_SECONDS` (e.g., 1 hour)
+- Resets to base interval when new data is found or manual sync is triggered
+
 ## How Sync Works
 
 ### Bilingual HKEX Fetching
@@ -597,7 +656,10 @@ Same as full sync, but the date range starts from the most recent `announcement_
 
 ### Scheduled Sync
 
-When `CELERY_ENABLED=true`, Celery Beat triggers `scheduled_incremental_sync` every hour by default.
+Two scheduling options are available:
+
+- **Built-in scheduler** (`SCHEDULER_ENABLED=true`) -- Runs as an asyncio background task with smart backoff. No Redis needed. Best for standalone deployments.
+- **Celery Beat** (`CELERY_ENABLED=true`) -- Classic Celery Beat triggers `scheduled_incremental_sync` every hour by default. Requires Redis.
 
 ## Dependencies
 

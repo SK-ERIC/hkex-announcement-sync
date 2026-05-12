@@ -16,8 +16,10 @@
 - **并发 PDF 下载** -- 可配置并发数（默认 5 个 worker）下载英文和中文版公告 PDF，支持失败重试
 - **自动去重** -- 基于唯一 `news_id` 自动跳过已同步的公告
 - **数据库持久化** -- 支持 SQLite、MySQL、PostgreSQL，通过 SQLAlchemy ORM 管理
-- **定时自动同步** -- 通过 Celery Beat 实现定时增量同步（默认每小时，可配置）
+- **内置调度器** -- 智能轮询调度器，支持自适应降频（独立模式下替代 Celery Beat）
 - **手动触发 API** -- `POST /api/sync` 按需触发同步，支持指定股票代码和时间范围
+- **并发保护** -- 防止同步任务重叠执行（已有同步运行时返回 409）
+- **实时 SSE 推送** -- `GET /api/sync/events` 向 Web UI 实时推送同步完成和调度器状态事件
 - **任务状态追踪** -- 通过 `GET /api/sync/status/{task_id}` 实时查询同步进度
 - **REST API 接口** -- 分页列表、详情、公告查询、PDF 下载等接口，供官网后台集成调用
 - **三重数据库支持** -- SQLite（默认）、MySQL、PostgreSQL，可通过配置切换
@@ -159,6 +161,13 @@ docker compose exec api alembic upgrade head
 | **内联模式** | `CELERY_ENABLED=false`（默认）  | 同步在 API 进程内直接执行                           |
 | **Celery**   | `CELERY_ENABLED=true`           | 同步通过 Redis 分发给 Celery Worker                 |
 
+**调度方式：**
+
+| 调度器            | 条件                         | 说明                                               |
+|-------------------|------------------------------|----------------------------------------------------|
+| **内置调度器**    | `SCHEDULER_ENABLED=true`     | Asyncio 后台任务，智能降频（无需 Redis）            |
+| **Celery Beat**   | `CELERY_ENABLED=true`        | 经典 Celery Beat 定时调度（需要 Redis）             |
+
 ## 项目结构
 
 ```text
@@ -184,6 +193,7 @@ hkex-announcement-sync/
 |   +-- services/
 |   |   +-- __init__.py
 |   |   +-- sync_service.py         # 同步编排逻辑
+|   |   +-- scheduler.py            # 内置智能轮询调度器
 |   |   +-- announcement_service.py # 公告 CRUD 操作
 |   +-- scraper/
 |   |   +-- __init__.py
@@ -419,6 +429,37 @@ curl "http://localhost:8000/api/bulletin?symbol=00700&pageindex=1&pagesize=5&lan
 { "status": "ok" }
 ```
 
+### 同步事件推送（SSE）
+
+**`GET /api/sync/events`**
+
+Server-Sent Events 端点，用于实时同步状态推送。Web UI 会自动连接。
+
+**事件类型：**
+
+| 事件               | 数据                                            | 说明                   |
+|--------------------|-------------------------------------------------|------------------------|
+| `scheduler_state`  | `{"interval": 900}`                             | 连接时发送初始调度状态  |
+| `sync_complete`    | `{"task_id", "status", "synced", "duration"}`  | 同步周期完成时触发      |
+| `heartbeat`        | `{}`                                            | 每 30 秒的心跳保活      |
+
+### 调度器状态
+
+**`GET /api/sync/scheduler-status`**
+
+**响应：**
+
+```json
+{
+  "enabled": true,
+  "running": false,
+  "base_interval": 900,
+  "current_interval": 900,
+  "smart_backoff": true,
+  "max_interval": 3600
+}
+```
+
 ## 数据库表结构
 
 ### `announcements` 公告表
@@ -559,6 +600,24 @@ SITE_URL=https://你的服务地址
 
 通知卡片会根据 `DEFAULT_LANGUAGE` 设置显示对应语言，并支持交互按钮（同步失败时重试、查看全部公告）。
 
+### 调度器
+
+内置智能轮询调度器，独立模式无需 Redis/Celery。
+
+| 变量                              | 默认值  | 说明                                       |
+|-----------------------------------|---------|--------------------------------------------|
+| `SCHEDULER_ENABLED`               | `false` | 启用内置调度器                             |
+| `SCHEDULER_INTERVAL_SECONDS`      | `900`   | 基础轮询间隔（秒），默认 15 分钟           |
+| `SCHEDULER_SMART_BACKOFF`         | `true`  | 无新数据时自动加倍间隔                     |
+| `SCHEDULER_MAX_INTERVAL_SECONDS`  | `3600`  | 最大间隔上限（秒），默认 1 小时            |
+
+**智能降频逻辑：**
+
+- 从 `SCHEDULER_INTERVAL_SECONDS`（如 15 分钟）开始
+- 每次未发现新数据时，间隔翻倍
+- 上限为 `SCHEDULER_MAX_INTERVAL_SECONDS`（如 1 小时）
+- 发现新数据或手动触发同步时，重置为基础间隔
+
 ## 同步流程说明
 
 ### 双语港交所数据获取
@@ -597,7 +656,10 @@ SITE_URL=https://你的服务地址
 
 ### 定时同步
 
-当 `CELERY_ENABLED=true` 时，Celery Beat 默认每小时触发一次增量同步。
+提供两种调度方式：
+
+- **内置调度器**（`SCHEDULER_ENABLED=true`）-- 作为 asyncio 后台任务运行，支持智能降频。无需 Redis，适用于独立部署。
+- **Celery Beat**（`CELERY_ENABLED=true`）-- 经典 Celery Beat 默认每小时触发一次增量同步。需要 Redis。
 
 ## 依赖管理
 
