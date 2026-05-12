@@ -124,3 +124,6 @@ class Announcement(Base):
     )
 
     __table_args__ = (Index("ix_stock_code_news_id", "stock_code", "news_id", unique=True),)
+
+
+from app.models.sync_log import SyncLog as SyncLog, SyncStatus as SyncStatus  # noqa: E402

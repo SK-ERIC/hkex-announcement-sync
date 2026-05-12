@@ -1,68 +1,87 @@
 """
-API endpoints for triggering and monitoring sync tasks.
+API endpoints for triggering, monitoring, and reviewing sync operations.
 
-触发和监控同步任务的 API 端点。
+触发、监控和查看同步操作的 API 端点。
 """
 
 import asyncio
 import logging
 import uuid
-from typing import Any
+from datetime import datetime
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.schemas.sync import SyncProgress, SyncRequest, SyncStatusResponse
+from app.database import get_db
+from app.models import Announcement, SyncLog, SyncStatus
+from app.schemas.sync import (
+    SyncLogResponse,
+    SyncProgress,
+    SyncRequest,
+    SyncStatusResponse,
+    SyncSummaryResponse,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/sync", tags=["sync"])
 
-# In-memory task store for non-Celery mode
-_tasks: dict[str, dict[str, Any]] = {}
-
 
 async def _run_sync_inline(
-    task_id: str,
+    sync_log_id: uuid.UUID,
     stock_codes: list[str] | None,
     mode: str,
 ) -> None:
     """
-    Execute sync directly in-process without Celery or Redis.
+    Execute sync directly in-process, recording progress to the sync_logs table.
 
-    在进程内直接执行同步，无需 Celery 或 Redis。
-
-    Args:
-    task_id: Unique task identifier for tracking. / 用于跟踪的唯一任务标识符。
-    stock_codes: Optional list of stock codes to sync. / 可选的要同步的股票代码列表。
-    mode: Sync mode string (e.g. 'full', 'incremental'). / 同步模式字符串。
-
+    在进程内直接执行同步，并将进度记录到 sync_logs 表。
     """
     from app.config import Settings
     from app.database import async_session_factory
     from app.services.sync_service import SyncService
 
-    settings = Settings()
-    if stock_codes:
-        settings = settings.model_copy(update={"SYNC_STOCK_CODES": ",".join(stock_codes)})
-
-    _tasks[task_id]["status"] = "running"
-
     async with async_session_factory() as db:
+        sync_log = await db.get(SyncLog, sync_log_id)
+        if not sync_log:
+            return
+
+        sync_log.status = SyncStatus.RUNNING
+        sync_log.started_at = datetime.utcnow()
+        await db.commit()
+
+        settings = Settings()
+        if stock_codes:
+            settings = settings.model_copy(update={"SYNC_STOCK_CODES": ",".join(stock_codes)})
+
         service = SyncService(db, settings)
-        # SyncService.run is sync, run it in a thread to not block the event loop
-        result = await asyncio.to_thread(service.run)
+        start = datetime.utcnow()
 
-    _tasks[task_id]["status"] = "success" if not result.get("errors") else "failed"
-    _tasks[task_id]["progress"] = SyncProgress(
-        total=result.get("total", 0),
-        synced=result.get("synced", 0),
-        skipped=result.get("skipped", 0),
-        failed=result.get("failed", 0),
-    )
-    if result.get("errors"):
-        _tasks[task_id]["error"] = "; ".join(result["errors"][:3])
+        try:
+            result = await asyncio.to_thread(service.run)
+            elapsed = (datetime.utcnow() - start).total_seconds()
 
-    logger.info("Inline sync task %s completed: %s", task_id, result)
+            sync_log.status = SyncStatus.SUCCESS if not result.get("errors") else SyncStatus.FAILED
+            sync_log.total = result.get("total", 0)
+            sync_log.synced = result.get("synced", 0)
+            sync_log.skipped = result.get("skipped", 0)
+            sync_log.failed = result.get("failed", 0)
+            sync_log.finished_at = datetime.utcnow()
+            sync_log.duration_seconds = elapsed
+            if result.get("errors"):
+                sync_log.error = "; ".join(result["errors"][:3])
+
+        except Exception as exc:
+            elapsed = (datetime.utcnow() - start).total_seconds()
+            sync_log.status = SyncStatus.FAILED
+            sync_log.finished_at = datetime.utcnow()
+            sync_log.duration_seconds = elapsed
+            sync_log.error = str(exc)[:500]
+            logger.exception("Inline sync task %s failed", sync_log_id)
+
+        await db.commit()
+        logger.info("Inline sync task %s completed", sync_log_id)
 
 
 @router.post("", response_model=dict)
@@ -71,23 +90,9 @@ async def trigger_sync(request: SyncRequest):
     Trigger a sync task via Celery or inline execution.
 
     触发同步任务，通过 Celery 或内联执行。
-
-    Uses Celery when CELERY_ENABLED=true and Redis is available.
-    Otherwise runs sync directly in-process as an asyncio background task.
-
-    当 CELERY_ENABLED=true 且 Redis 可用时使用 Celery。
-    否则作为 asyncio 后台任务在进程内直接运行同步。
-
-    Args:
-    request: Sync request body with stock_codes, mode, and date range.
-    包含 stock_codes、mode 和日期范围的同步请求体。
-
-    Returns:
-    dict: {"task_id": str} for tracking the sync task status.
-    {"task_id": str} 用于跟踪同步任务状态。
-
     """
     settings = get_settings()
+    stock_codes_str = ",".join(request.stock_codes) if request.stock_codes else ",".join(settings.stock_codes)
 
     if settings.CELERY_ENABLED:
         from app.tasks.sync_tasks import sync_announcements_task
@@ -100,23 +105,29 @@ async def trigger_sync(request: SyncRequest):
         )
         return {"task_id": task.id}
 
-    # Inline mode — no Celery/Redis needed
-    task_id = str(uuid.uuid4())
-    _tasks[task_id] = {
-        "status": "pending",
-        "progress": SyncProgress(),
-        "error": None,
-    }
+    # Inline mode — create a SyncLog record and run in background
+    from app.database import async_session_factory
+
+    async with async_session_factory() as db:
+        sync_log = SyncLog(
+            stock_codes=stock_codes_str,
+            mode=request.mode.value,
+            status=SyncStatus.PENDING,
+        )
+        db.add(sync_log)
+        await db.commit()
+        await db.refresh(sync_log)
+        log_id = sync_log.id
 
     asyncio.create_task(
         _run_sync_inline(
-            task_id,
+            log_id,
             request.stock_codes,
             request.mode.value,
         )
     )
 
-    return {"task_id": task_id}
+    return {"task_id": str(log_id)}
 
 
 @router.get("/status/{task_id}", response_model=SyncStatusResponse)
@@ -125,21 +136,6 @@ async def get_sync_status(task_id: str):
     Query the current status of a sync task by its task ID.
 
     通过任务 ID 查询同步任务的当前状态。
-
-    Checks Celery result backend when Celery is enabled,
-    otherwise looks up the in-memory task store.
-
-    当 Celery 启用时查询 Celery 结果后端，
-    否则查询内存中的任务存储。
-
-    Args:
-    task_id: The unique task identifier returned by trigger_sync.
-    由 trigger_sync 返回的唯一任务标识符。
-
-    Returns:
-    SyncStatusResponse: Current task status with progress details and any errors.
-    包含进度详情和错误信息的当前任务状态。
-
     """
     settings = get_settings()
 
@@ -171,14 +167,77 @@ async def get_sync_status(task_id: str):
         else:
             return SyncStatusResponse(task_id=task_id, status=result.state.lower())
 
-    # Inline mode — look up in-memory store
-    task = _tasks.get(task_id)
-    if not task:
-        return SyncStatusResponse(task_id=task_id, status="not_found", error="Task not found")
+    # Inline mode — look up SyncLog in database
+    from app.database import async_session_factory
 
-    return SyncStatusResponse(
-        task_id=task_id,
-        status=task["status"],
-        progress=task["progress"],
-        error=task.get("error"),
+    try:
+        log_uuid = uuid.UUID(task_id)
+    except ValueError:
+        return SyncStatusResponse(task_id=task_id, status="not_found", error="Invalid task ID")
+
+    async with async_session_factory() as db:
+        sync_log = await db.get(SyncLog, log_uuid)
+        if not sync_log:
+            return SyncStatusResponse(task_id=task_id, status="not_found", error="Task not found")
+
+        return SyncStatusResponse(
+            task_id=task_id,
+            status=sync_log.status.value,
+            progress=SyncProgress(
+                total=sync_log.total,
+                synced=sync_log.synced,
+                skipped=sync_log.skipped,
+                failed=sync_log.failed,
+            ),
+            error=sync_log.error,
+        )
+
+
+@router.get("/summary", response_model=SyncSummaryResponse)
+async def get_sync_summary(db: AsyncSession = Depends(get_db)):
+    """
+    Get a summary of the most recent sync and overall stats.
+
+    获取最近一次同步的摘要和整体统计信息。
+    """
+    last_log = await db.execute(
+        select(SyncLog)
+        .where(SyncLog.status.in_([SyncStatus.SUCCESS, SyncStatus.FAILED]))
+        .order_by(SyncLog.created_at.desc())
+        .limit(1)
     )
+    last = last_log.scalar_one_or_none()
+
+    total_syncs = await db.execute(select(func.count(SyncLog.id)))
+    total_announcements = await db.execute(select(func.count(Announcement.id)))
+
+    return SyncSummaryResponse(
+        last_sync_at=last.finished_at if last else None,
+        last_sync_status=last.status.value if last else None,
+        last_sync_stock_codes=last.stock_codes if last else None,
+        last_sync_duration_seconds=last.duration_seconds if last else None,
+        last_sync_synced=last.synced if last else 0,
+        last_sync_skipped=last.skipped if last else 0,
+        last_sync_failed=last.failed if last else 0,
+        total_syncs=total_syncs.scalar() or 0,
+        total_announcements=total_announcements.scalar() or 0,
+    )
+
+
+@router.get("/logs", response_model=list[SyncLogResponse])
+async def list_sync_logs(
+    page: int = 1,
+    page_size: int = 20,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    List recent sync operation logs.
+
+    列出最近的同步操作日志。
+    """
+    offset = (page - 1) * page_size
+    result = await db.execute(
+        select(SyncLog).order_by(SyncLog.created_at.desc()).offset(offset).limit(page_size)
+    )
+    logs = result.scalars().all()
+    return logs
