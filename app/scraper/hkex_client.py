@@ -4,6 +4,7 @@ HKEX disclosure platform scraper client.
 港交所披露平台数据抓取客户端。
 """
 
+import html
 import json
 import logging
 import re
@@ -409,6 +410,26 @@ class HKEXClient:
         return all_records
 
     @staticmethod
+    def _clean_text(text: str) -> str:
+        """
+        Decode HTML entities and strip HTML tags from HKEX API text fields.
+
+        解码 HTML 实体并清除港交所 API 文本字段中的 HTML 标签。
+
+        Args:
+        text: Raw text from HKEX API. / 港交所 API 原始文本。
+
+        Returns:
+        str: Cleaned plain text. / 清洗后的纯文本。
+
+        """
+        if not text:
+            return ""
+        text = html.unescape(text)
+        text = re.sub(r"<[^>]+>", " ", text)
+        return " ".join(text.split())
+
+    @staticmethod
     def _parse_single_record(raw: dict[str, Any], stock_code: str) -> dict[str, Any]:
         """
         Parse a single raw HKEX API record into a normalized dictionary.
@@ -444,12 +465,12 @@ class HKEXClient:
             }
 
         file_link = raw.get("FILE_LINK", "")
-        title = raw.get("TITLE", "")
-        stock_name = raw.get("STOCK_NAME", "").replace("<br/>", " ").strip()
-        filing_type = raw.get("LONG_TEXT", raw.get("SHORT_TEXT", ""))
+        title = HKEXClient._clean_text(raw.get("TITLE", ""))
+        stock_name = HKEXClient._clean_text(raw.get("STOCK_NAME", ""))
+        filing_type = HKEXClient._clean_text(raw.get("LONG_TEXT", raw.get("SHORT_TEXT", "")))
         news_id = raw.get("NEWS_ID", "")
-        short_text = raw.get("SHORT_TEXT", "")
-        long_text = raw.get("LONG_TEXT", "")
+        short_text = HKEXClient._clean_text(raw.get("SHORT_TEXT", ""))
+        long_text = HKEXClient._clean_text(raw.get("LONG_TEXT", ""))
         file_type = raw.get("FILE_TYPE", "PDF")
 
         date_str = raw.get("DATE_TIME", "")
