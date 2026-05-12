@@ -88,3 +88,29 @@ services:
 volumes:
   mysql_data:
   pdf_data:
+
+# ============================================================
+# Standalone mode (no Redis/Celery needed)
+# ============================================================
+# Use docker compose -f docker-compose.yml -f docker-compose.standalone.yml up
+# Or copy the profile below. Only requires the database service.
+#
+# standalone:
+#   build: .
+#   ports:
+#     - "8000:8000"
+#   environment:
+#     - DATABASE_URL=mysql+asyncmy://hkex:hkex_secret@db:3306/hkex_sync
+#     - STORAGE_BACKEND=local
+#     - STORAGE_LOCAL_PATH=/app/data/pdfs
+#     - SYNC_STOCK_CODES=00700,09988
+#     - SCHEDULER_ENABLED=true
+#     - SCHEDULER_INTERVAL_SECONDS=900
+#     - SCHEDULER_SMART_BACKOFF=true
+#     - SCHEDULER_MAX_INTERVAL_SECONDS=3600
+#   volumes:
+#     - pdf_data:/app/data/pdfs
+#   depends_on:
+#     db:
+#       condition: service_healthy
+#   command: uvicorn app.main:app --host 0.0.0.0 --port 8000

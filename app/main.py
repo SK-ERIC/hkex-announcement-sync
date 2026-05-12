@@ -4,6 +4,7 @@ FastAPI application entry point with lifespan management.
 FastAPI 应用入口，包含生命周期管理。
 """
 
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -16,6 +17,8 @@ from app.api.router import api_router
 from app.utils.logging import setup_logging
 
 STATIC_DIR = Path(__file__).parent / "static"
+
+_scheduler_task: asyncio.Task | None = None
 
 
 @asynccontextmanager
@@ -31,7 +34,25 @@ async def lifespan(app: FastAPI):
 
     await init_db()
 
+    # Start built-in scheduler if enabled
+    from app.config import get_settings
+
+    settings = get_settings()
+    if settings.SCHEDULER_ENABLED:
+        from app.services.scheduler import run_scheduler
+
+        global _scheduler_task
+        _scheduler_task = asyncio.create_task(run_scheduler())
+
     yield
+
+    # Gracefully stop scheduler on shutdown
+    if _scheduler_task:
+        _scheduler_task.cancel()
+        try:
+            await _scheduler_task
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(

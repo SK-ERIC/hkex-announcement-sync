@@ -171,10 +171,11 @@
     const html = items
       .map(
         (item) => `
-      <div class="announcement-card" data-id="${item.id}">
+      <div class="announcement-card ${item.status && item.status !== 'active' ? 'card-cancelled' : ''}" data-id="${item.id}">
         <div class="card-header">
           <span class="card-stock">${item.stock_code}</span>
           <span class="card-stock-name">${esc(item.stock_name)}</span>
+          ${item.status && item.status !== 'active' ? `<span class="card-status status-${item.status}">${formatStatus(item.status)}</span>` : ""}
           ${item.filing_type ? `<span class="card-type">${esc(item.filing_type)}</span>` : ""}
           <span class="card-date">${formatDate(item.announcement_date)}</span>
         </div>
@@ -234,6 +235,11 @@
       const item = await resp.json();
 
       body.innerHTML = `
+        ${item.status && item.status !== 'active' ? `
+        <div class="detail-status-banner">
+          <span class="card-status status-${item.status}">${formatStatus(item.status)}</span>
+        </div>
+        ` : ""}
         <div class="detail-header">
           <div class="detail-stock">
             <span class="card-stock">${item.stock_code}</span>
@@ -322,6 +328,42 @@
     return (bytes / 1024 / 1024).toFixed(1) + " MB";
   }
 
+  function formatStatus(status) {
+    const labels = {
+      active: "",
+      cancelled_superseded: "Superseded",
+      cancelled_reissued: "Reissued",
+      headlines_revised: "Revised",
+    };
+    return labels[status] || status;
+  }
+
+  // --- Reconcile ---
+
+  $("#reconcile-btn").addEventListener("click", async () => {
+    const btn = $("#reconcile-btn");
+    btn.disabled = true;
+    btn.textContent = "Checking...";
+    try {
+      const resp = await fetch(`${API}/sync/reconcile`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ days_back: 30 }),
+      });
+      if (resp.ok) {
+        const { task_id } = await resp.json();
+        pollSyncStatus(task_id);
+      } else {
+        const err = await resp.json();
+        showSyncStatus("failed", "Reconcile failed: " + (err.detail || "unknown error"));
+      }
+    } catch (err) {
+      showSyncStatus("failed", "Reconcile failed: " + err.message);
+    }
+    btn.disabled = false;
+    btn.textContent = "Reconcile";
+  });
+
   // --- Sync Summary ---
 
   async function loadSyncSummary() {
@@ -361,10 +403,47 @@
     totalEl.textContent = data.total_announcements != null ? data.total_announcements : "--";
   }
 
+  // --- SSE ---
+
+  function connectSSE() {
+    try {
+      const source = new EventSource(`${API}/sync/events`);
+      source.addEventListener("sync_complete", (e) => {
+        const data = JSON.parse(e.data);
+        loadSyncSummary();
+        if (data.synced > 0) {
+          loadAnnouncements();
+        }
+      });
+      source.addEventListener("reconcile_complete", () => {
+        loadAnnouncements();
+        loadSyncSummary();
+      });
+      source.addEventListener("scheduler_state", (e) => {
+        const data = JSON.parse(e.data);
+        updateSchedulerBadge(data.interval);
+      });
+      source.onerror = () => {
+        source.close();
+        setTimeout(connectSSE, 10000);
+      };
+    } catch {
+      // SSE not supported or not available
+    }
+  }
+
+  function updateSchedulerBadge(interval) {
+    const el = $("#scheduler-badge");
+    if (!el) return;
+    const mins = Math.round(interval / 60);
+    el.textContent = `Auto: ${mins}m`;
+  }
+
   // --- Init ---
 
   initLang();
   updatePlaceholders();
   loadSyncSummary();
   loadAnnouncements();
+  connectSSE();
 })();

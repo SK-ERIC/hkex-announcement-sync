@@ -5,11 +5,13 @@ API endpoints for triggering, monitoring, and reviewing sync operations.
 """
 
 import asyncio
+import json
 import logging
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +19,7 @@ from app.config import get_settings
 from app.database import get_db
 from app.models import Announcement, SyncLog, SyncStatus
 from app.schemas.sync import (
+    ReconcileRequest,
     SyncLogResponse,
     SyncProgress,
     SyncRequest,
@@ -105,6 +108,12 @@ async def trigger_sync(request: SyncRequest):
     settings = get_settings()
     stock_codes_str = ",".join(request.stock_codes) if request.stock_codes else ",".join(settings.stock_codes)
 
+    # Prevent concurrent sync execution
+    from app.services.scheduler import is_sync_running, reset_scheduler_interval
+
+    if is_sync_running():
+        raise HTTPException(status_code=409, detail="A sync task is already running")
+
     if settings.CELERY_ENABLED:
         from app.tasks.sync_tasks import sync_announcements_task
 
@@ -118,6 +127,9 @@ async def trigger_sync(request: SyncRequest):
 
     # Inline mode — create a SyncLog record and run in background
     from app.database import async_session_factory
+
+    # Reset scheduler interval after manual sync
+    reset_scheduler_interval()
 
     async with async_session_factory() as db:
         sync_log = SyncLog(
@@ -135,6 +147,106 @@ async def trigger_sync(request: SyncRequest):
             log_id,
             request.stock_codes,
             request.mode.value,
+        )
+    )
+
+    return {"task_id": str(log_id)}
+
+
+async def _run_reconcile_inline(
+    sync_log_id: uuid.UUID,
+    stock_codes: list[str],
+    date_from: datetime | None,
+    date_to: datetime | None,
+    days_back: int,
+) -> None:
+    """
+    Execute reconciliation directly in-process, recording progress to the sync_logs table.
+
+    在进程内直接执行对账，并将进度记录到 sync_logs 表。
+    """
+    from app.config import Settings
+    from app.database import async_session_factory
+    from app.services.reconcile_service import ReconcileService
+
+    async with async_session_factory() as db:
+        sync_log = await db.get(SyncLog, sync_log_id)
+        if not sync_log:
+            return
+
+        sync_log.status = SyncStatus.RUNNING
+        sync_log.started_at = datetime.utcnow()
+        await db.commit()
+
+        settings = Settings()
+        service = ReconcileService(db, settings)
+        start = datetime.utcnow()
+
+        try:
+            result = await asyncio.to_thread(
+                service.run,
+                stock_codes=stock_codes,
+                date_from=date_from.date() if date_from else None,
+                date_to=date_to.date() if date_to else None,
+                days_back=days_back,
+            )
+            elapsed = (datetime.utcnow() - start).total_seconds()
+
+            sync_log.status = SyncStatus.SUCCESS
+            sync_log.total = result.get("total", 0)
+            sync_log.synced = result.get("updated", 0)
+            sync_log.skipped = result.get("unchanged", 0)
+            sync_log.failed = result.get("failed", 0)
+            sync_log.finished_at = datetime.utcnow()
+            sync_log.duration_seconds = elapsed
+
+        except Exception as exc:
+            sync_log.status = SyncStatus.FAILED
+            sync_log.finished_at = datetime.utcnow()
+            sync_log.duration_seconds = (datetime.utcnow() - start).total_seconds()
+            sync_log.error = str(exc)[:500]
+            logger.exception("Inline reconcile task %s failed", sync_log_id)
+
+        await db.commit()
+        logger.info("Inline reconcile task %s completed", sync_log_id)
+
+
+@router.post("/reconcile", response_model=dict)
+async def trigger_reconcile(request: ReconcileRequest):
+    """
+    Trigger a reconciliation to detect announcement status changes.
+
+    触发对账操作，检测公告状态变更。
+    """
+    from app.services.scheduler import is_sync_running
+
+    if is_sync_running():
+        raise HTTPException(status_code=409, detail="A sync task is already running")
+
+    from app.database import async_session_factory
+
+    settings = get_settings()
+    stock_codes = request.stock_codes or settings.stock_codes
+    stock_codes_str = ",".join(stock_codes)
+
+    async with async_session_factory() as db:
+        sync_log = SyncLog(
+            stock_codes=stock_codes_str,
+            mode="reconcile",
+            status=SyncStatus.PENDING,
+        )
+        db.add(sync_log)
+        await db.commit()
+        await db.refresh(sync_log)
+        log_id = sync_log.id
+
+    asyncio.create_task(
+        _run_reconcile_inline(
+            log_id,
+            stock_codes,
+            request.date_from,
+            request.date_to,
+            request.days_back,
         )
     )
 
@@ -252,3 +364,55 @@ async def list_sync_logs(
     )
     logs = result.scalars().all()
     return logs
+
+
+@router.get("/events")
+async def sync_events():
+    """
+    SSE endpoint for real-time sync status updates.
+
+    SSE 端点，用于实时同步状态推送。
+
+    Clients receive events when syncs complete or scheduler state changes.
+    """
+    from app.services.scheduler import get_current_interval, subscribe_sse, unsubscribe_sse
+
+    queue = subscribe_sse()
+
+    async def event_generator():
+        try:
+            # Send initial state
+            yield f"event: scheduler_state\ndata: {json.dumps({'interval': get_current_interval()})}\n\n"
+
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=30)
+                    yield f"event: {event['event']}\ndata: {json.dumps(event['data'])}\n\n"
+                except asyncio.TimeoutError:
+                    yield "event: heartbeat\ndata: {}\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            unsubscribe_sse(queue)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@router.get("/scheduler-status")
+async def scheduler_status():
+    """
+    Get current scheduler state (running, interval, smart backoff).
+
+    获取调度器当前状态（是否运行、当前间隔、智能降频状态）。
+    """
+    from app.services.scheduler import get_current_interval, is_sync_running
+
+    settings = get_settings()
+    return {
+        "enabled": settings.SCHEDULER_ENABLED,
+        "running": is_sync_running(),
+        "base_interval": settings.SCHEDULER_INTERVAL_SECONDS,
+        "current_interval": get_current_interval(),
+        "smart_backoff": settings.SCHEDULER_SMART_BACKOFF,
+        "max_interval": settings.SCHEDULER_MAX_INTERVAL_SECONDS,
+    }

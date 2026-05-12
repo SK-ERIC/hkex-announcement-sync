@@ -118,6 +118,16 @@ class Settings(BaseSettings):
     NOTIFIER_ON_NEW: bool = True
     SITE_URL: str = "http://localhost:8000"
 
+    # Scheduler — built-in auto sync (standalone mode, replaces Celery Beat)
+    SCHEDULER_ENABLED: bool = False
+    SCHEDULER_INTERVAL_SECONDS: int = 900  # 15 minutes
+    SCHEDULER_SMART_BACKOFF: bool = True
+    SCHEDULER_MAX_INTERVAL_SECONDS: int = 3600  # 1 hour cap
+
+    # Reconciliation — detect cancelled/superseded announcements from HKEX
+    RECONCILE_ENABLED: bool = True
+    RECONCILE_DAYS_BACK: int = 30
+
     @computed_field
     @property
     def stock_codes(self) -> list[str]:
