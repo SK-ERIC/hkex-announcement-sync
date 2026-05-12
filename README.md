@@ -529,6 +529,36 @@ DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/hkex_sync
 | `HTTP_MAX_RETRIES`   | `3`     | Maximum retry attempts per request       |
 | `HTTP_RETRY_BACKOFF` | `1.0`   | Exponential backoff multiplier (seconds) |
 
+### Notification
+
+Send sync results and new announcement alerts to team chat bots.
+
+| Variable                  | Default                | Description                                                  |
+|---------------------------|------------------------|--------------------------------------------------------------|
+| `NOTIFIER_ENABLED`        | `false`                | Enable bot notifications                                     |
+| `NOTIFIER_TYPE`           | --                     | Bot type: `feishu`, `wecom`, `dingtalk`                     |
+| `NOTIFIER_ON_SYNC`        | `true`                 | Send notification on sync completion                         |
+| `NOTIFIER_ON_NEW`         | `true`                 | Send notification when new announcements are synced          |
+| `NOTIFIER_FEISHU_WEBHOOK` | --                     | Feishu/Lark custom bot webhook URL                           |
+| `NOTIFIER_FEISHU_SECRET`  | --                     | Feishu webhook sign secret (optional)                        |
+| `SITE_URL`                | `http://localhost:8000`| Public URL of this service (used in notification buttons)    |
+
+**Feishu (Lark) setup:**
+
+1. Create a custom bot in your Feishu group
+2. Copy the webhook URL and optional sign secret
+3. Configure environment variables:
+
+```bash
+NOTIFIER_ENABLED=true
+NOTIFIER_TYPE=feishu
+NOTIFIER_FEISHU_WEBHOOK=https://open.feishu.cn/open-apis/bot/v2/hook/xxx
+NOTIFIER_FEISHU_SECRET=your_sign_secret
+SITE_URL=https://your-service-url.com
+```
+
+Notification cards follow the `DEFAULT_LANGUAGE` setting and support interactive buttons (retry on failure, view all announcements).
+
 ## How Sync Works
 
 ### Bilingual HKEX Fetching

@@ -529,6 +529,36 @@ DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/hkex_sync
 | `HTTP_MAX_RETRIES`    | `3`    | 请求最大重试次数              |
 | `HTTP_RETRY_BACKOFF`  | `1.0`  | 指数退避乘数（秒）            |
 
+### 机器人通知
+
+将同步结果和新公告推送到团队群聊机器人。
+
+| 变量                      | 默认值                  | 说明                                                   |
+|---------------------------|-------------------------|--------------------------------------------------------|
+| `NOTIFIER_ENABLED`        | `false`                 | 启用机器人通知                                          |
+| `NOTIFIER_TYPE`           | --                      | 机器人类型：`feishu`、`wecom`、`dingtalk`              |
+| `NOTIFIER_ON_SYNC`        | `true`                  | 同步完成后发送通知                                      |
+| `NOTIFIER_ON_NEW`         | `true`                  | 有新公告时发送推送                                      |
+| `NOTIFIER_FEISHU_WEBHOOK` | --                      | 飞书自定义机器人 Webhook URL                            |
+| `NOTIFIER_FEISHU_SECRET`  | --                      | 飞书 Webhook 签名密钥（可选）                           |
+| `SITE_URL`                | `http://localhost:8000` | 服务的对外访问地址（用于通知卡片按钮跳转）              |
+
+**飞书机器人配置步骤：**
+
+1. 在飞书群中创建自定义机器人
+2. 复制 Webhook 地址和签名校验密钥（可选）
+3. 配置环境变量：
+
+```bash
+NOTIFIER_ENABLED=true
+NOTIFIER_TYPE=feishu
+NOTIFIER_FEISHU_WEBHOOK=https://open.feishu.cn/open-apis/bot/v2/hook/xxx
+NOTIFIER_FEISHU_SECRET=你的签名密钥
+SITE_URL=https://你的服务地址
+```
+
+通知卡片会根据 `DEFAULT_LANGUAGE` 设置显示对应语言，并支持交互按钮（同步失败时重试、查看全部公告）。
+
 ## 同步流程说明
 
 ### 双语港交所数据获取
