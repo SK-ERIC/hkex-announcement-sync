@@ -611,6 +611,9 @@ DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/hkex_sync
 | `HTTP_TIMEOUT`        | `60`   | 请求超时时间（秒）            |
 | `HTTP_MAX_RETRIES`    | `3`    | 请求最大重试次数              |
 | `HTTP_RETRY_BACKOFF`  | `1.0`  | 指数退避乘数（秒）            |
+| `HTTP_REQUESTS_PER_SECOND` | `2.0` | 对港交所的最大请求速率（请求/秒） |
+| `HTTP_DELAY_JITTER`   | `0.5`  | 请求间随机抖动（秒）         |
+| `HTTP_PROXY`          | --     | HTTP/SOCKS 代理 URL（如 `socks5://127.0.0.1:1080`） |
 
 ### 机器人通知
 

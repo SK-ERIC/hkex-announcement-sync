@@ -611,10 +611,9 @@ DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/hkex_sync
 | `HTTP_TIMEOUT`       | `60`    | Request timeout in seconds               |
 | `HTTP_MAX_RETRIES`   | `3`     | Maximum retry attempts per request       |
 | `HTTP_RETRY_BACKOFF` | `1.0`   | Exponential backoff multiplier (seconds) |
-
-### Notification
-
-Send sync results and new announcement alerts to team chat bots.
+| `HTTP_REQUESTS_PER_SECOND` | `2.0` | Max requests/sec to HKEX (rate limiting) |
+| `HTTP_DELAY_JITTER`  | `0.5`   | Random jitter added between requests (s) |
+| `HTTP_PROXY`         | --      | HTTP/SOCKS proxy URL (e.g. `socks5://127.0.0.1:1080`) |
 
 | Variable                  | Default                | Description                                                  |
 |---------------------------|------------------------|--------------------------------------------------------------|
