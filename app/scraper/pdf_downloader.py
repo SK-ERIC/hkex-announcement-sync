@@ -47,13 +47,9 @@ class PDFDownloader:
         """
         self._storage = storage
         self._settings = settings or Settings()
-        self._http = httpx.Client(
-            timeout=self._settings.HTTP_TIMEOUT,
-            headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            },
-            follow_redirects=True,
-        )
+        from app.scraper.http import create_client
+
+        self._http = create_client(self._settings)
 
     def close(self):
         """

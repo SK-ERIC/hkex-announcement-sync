@@ -102,6 +102,9 @@ class Settings(BaseSettings):
     HTTP_TIMEOUT: int = 60
     HTTP_MAX_RETRIES: int = 3
     HTTP_RETRY_BACKOFF: float = 1.0
+    HTTP_REQUESTS_PER_SECOND: float = 2.0
+    HTTP_DELAY_JITTER: float = 0.5
+    HTTP_PROXY: str = ""
 
     # API
     API_PREFIX: str = "/api"

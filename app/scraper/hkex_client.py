@@ -13,6 +13,7 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 import httpx
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.config import Settings
 
@@ -63,6 +64,7 @@ class HKEXClient:
         """
         self._settings = settings or Settings()
         self._session: httpx.Client | None = None
+        self._rate_limiter: Any = None
 
     def close(self):
         """
@@ -101,14 +103,21 @@ class HKEXClient:
 
         """
         if self._session is None:
-            self._session = httpx.Client(
-                timeout=self._settings.HTTP_TIMEOUT,
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                },
-                follow_redirects=True,
-            )
+            from app.scraper.http import create_client
+
+            self._session = create_client(self._settings)
         return self._session
+
+    def _get_rate_limiter(self):
+        """Get or create the rate limiter (lazy initialization)."""
+        if self._rate_limiter is None:
+            from app.scraper.http import RateLimiter
+
+            self._rate_limiter = RateLimiter(
+                requests_per_second=self._settings.HTTP_REQUESTS_PER_SECOND,
+                jitter=self._settings.HTTP_DELAY_JITTER,
+            )
+        return self._rate_limiter
 
     def get_stock_id(self, stock_code: str) -> str:
         """
@@ -282,6 +291,11 @@ class HKEXClient:
 
         return all_records
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=30),
+        retry=retry_if_exception_type((httpx.HTTPError, httpx.TimeoutException)),
+    )
     def _fetch_chunk(
         self,
         stock_id: str,
@@ -412,7 +426,7 @@ class HKEXClient:
             if not has_next:
                 break
 
-            time.sleep(0.5)
+            self._get_rate_limiter().wait()
 
         return all_records
 
