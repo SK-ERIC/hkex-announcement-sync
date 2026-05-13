@@ -8,7 +8,7 @@ import asyncio
 import json
 import logging
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -156,8 +156,8 @@ async def trigger_sync(request: SyncRequest):
 async def _run_reconcile_inline(
     sync_log_id: uuid.UUID,
     stock_codes: list[str],
-    date_from: datetime | None,
-    date_to: datetime | None,
+    date_from: date | None,
+    date_to: date | None,
     days_back: int,
 ) -> None:
     """
@@ -186,8 +186,8 @@ async def _run_reconcile_inline(
             result = await asyncio.to_thread(
                 service.run,
                 stock_codes=stock_codes,
-                date_from=date_from.date() if date_from else None,
-                date_to=date_to.date() if date_to else None,
+                date_from=date_from,
+                date_to=date_to,
                 days_back=days_back,
             )
             elapsed = (datetime.utcnow() - start).total_seconds()
