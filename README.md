@@ -20,6 +20,8 @@ A standalone backend data synchronization service that automatically fetches all
 - **Manual Trigger API** -- `POST /api/sync` to trigger on-demand sync with optional stock codes and date range
 - **Concurrency Protection** -- Prevents overlapping sync tasks (returns 409 if a sync is already running)
 - **Real-time SSE Events** -- `GET /api/sync/events` streams sync completions and scheduler state to the Web UI
+- **Cancellation Detection** -- Automatically detect and mark superseded, reissued, and revised announcements from HKEX
+- **Data Reconciliation** -- Built-in and manual reconciliation to detect announcement status changes (configurable lookback window)
 - **Task Status Tracking** -- Poll `GET /api/sync/status/{task_id}` for real-time sync progress
 - **REST API** -- Paginated list, detail, bulletin query, and PDF download endpoints for website backend integration
 - **Triple Database Support** -- SQLite (default), MySQL, and PostgreSQL, switchable via config
@@ -56,7 +58,7 @@ Visit `http://localhost:8000` for the Web UI, or `http://localhost:8000/docs` fo
 
 | Variable             | Default                | Description                                    |
 |----------------------|------------------------|------------------------------------------------|
-| `SYNC_STOCK_CODES`   | `00700,09988`          | Comma-separated stock codes to sync            |
+| `SYNC_STOCK_CODES`   | `00700`                | Comma-separated stock codes to sync            |
 | `DEFAULT_LANGUAGE`   | `en`                   | Default UI/API language (`en`, `zh`, or `cn`)  |
 | `PORT`               | `8000`                 | Host port to expose                            |
 
@@ -194,6 +196,7 @@ hkex-announcement-sync/
 |   |   +-- __init__.py
 |   |   +-- sync_service.py         # Sync orchestration pipeline
 |   |   +-- scheduler.py            # Built-in smart polling scheduler
+|   |   +-- reconcile_service.py    # Reconciliation service for status changes
 |   |   +-- announcement_service.py # Announcement CRUD operations
 |   +-- scraper/
 |   |   +-- __init__.py
@@ -205,6 +208,11 @@ hkex-announcement-sync/
 |   |   +-- local.py                # Local filesystem storage
 |   |   +-- s3.py                   # S3-compatible storage
 |   |   +-- factory.py              # Storage backend factory
+|   +-- notifiers/
+|   |   +-- __init__.py
+|   |   +-- base.py                 # Notifier abstract base class
+|   |   +-- feishu.py               # Feishu/Lark webhook notifier
+|   |   +-- factory.py              # Notifier factory
 |   +-- tasks/
 |   |   +-- __init__.py
 |   |   +-- celery_app.py           # Celery instance & Beat schedule
@@ -327,6 +335,7 @@ curl "http://localhost:8000/api/announcements?stock_code=00700&page=1&page_size=
       "file_type": "PDF",
       "file_size": 102400,
       "announcement_date": "2026-04-30T17:00:00",
+      "status": "active",
       "source": "auto",
       "is_visible": true,
       "download_url": "/api/announcements/550e8400.../download",
@@ -459,6 +468,39 @@ Server-Sent Events endpoint for real-time sync status updates. The Web UI connec
   "max_interval": 3600
 }
 ```
+
+### Reconcile Announcements
+
+**`POST /api/sync/reconcile`**
+
+Trigger a reconciliation to detect announcement status changes (cancelled, superseded, revised).
+
+**Request Body:**
+
+| Field         | Type           | Default | Description                                        |
+|---------------|----------------|---------|----------------------------------------------------|
+| `stock_codes` | `list[string]` | Config  | Stock codes to reconcile                           |
+| `date_from`   | `date`         | Auto    | Start date (defaults to days_back from today)      |
+| `date_to`     | `date`         | Today   | End date                                           |
+| `days_back`   | `int`          | `30`    | Lookback window in days when date_from is not set  |
+
+**Example:**
+
+```bash
+curl -X POST http://localhost:8000/api/sync/reconcile \
+  -H "Content-Type: application/json" \
+  -d '{"days_back": 30}'
+```
+
+**Response:**
+
+```json
+{
+  "task_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+}
+```
+
+Track progress via `GET /api/sync/status/{task_id}`.
 
 ## Database Schema
 
@@ -617,6 +659,15 @@ Built-in smart polling scheduler for standalone mode (no Redis/Celery needed).
 - Each cycle with no new data doubles the interval
 - Caps at `SCHEDULER_MAX_INTERVAL_SECONDS` (e.g., 1 hour)
 - Resets to base interval when new data is found or manual sync is triggered
+
+### Reconciliation
+
+Detect cancelled/superseded announcements by re-checking HKEX data.
+
+| Variable                 | Default | Description                                              |
+|--------------------------|---------|----------------------------------------------------------|
+| `RECONCILE_ENABLED`      | `true`  | Enable post-sync reconciliation                          |
+| `RECONCILE_DAYS_BACK`    | `30`    | How many days back to check for status changes           |
 
 ## How Sync Works
 

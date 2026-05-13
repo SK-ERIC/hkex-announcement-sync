@@ -20,6 +20,8 @@
 - **手动触发 API** -- `POST /api/sync` 按需触发同步，支持指定股票代码和时间范围
 - **并发保护** -- 防止同步任务重叠执行（已有同步运行时返回 409）
 - **实时 SSE 推送** -- `GET /api/sync/events` 向 Web UI 实时推送同步完成和调度器状态事件
+- **取消公告检测** -- 自动检测并标记港交所被取代、重新发布和修订的公告
+- **数据对账** -- 内置和手动对账机制，检测公告状态变更（可配置回看窗口）
 - **任务状态追踪** -- 通过 `GET /api/sync/status/{task_id}` 实时查询同步进度
 - **REST API 接口** -- 分页列表、详情、公告查询、PDF 下载等接口，供官网后台集成调用
 - **三重数据库支持** -- SQLite（默认）、MySQL、PostgreSQL，可通过配置切换
@@ -194,6 +196,7 @@ hkex-announcement-sync/
 |   |   +-- __init__.py
 |   |   +-- sync_service.py         # 同步编排逻辑
 |   |   +-- scheduler.py            # 内置智能轮询调度器
+|   |   +-- reconcile_service.py    # 公告状态变更对账服务
 |   |   +-- announcement_service.py # 公告 CRUD 操作
 |   +-- scraper/
 |   |   +-- __init__.py
@@ -205,6 +208,11 @@ hkex-announcement-sync/
 |   |   +-- local.py                # 本地文件系统存储
 |   |   +-- s3.py                   # S3 兼容存储
 |   |   +-- factory.py              # 存储后端工厂
+|   +-- notifiers/
+|   |   +-- __init__.py
+|   |   +-- base.py                 # 通知器抽象基类
+|   |   +-- feishu.py               # 飞书 Webhook 通知器
+|   |   +-- factory.py              # 通知器工厂
 |   +-- tasks/
 |   |   +-- __init__.py
 |   |   +-- celery_app.py           # Celery 实例与 Beat 调度配置
@@ -327,6 +335,7 @@ curl "http://localhost:8000/api/announcements?stock_code=00700&page=1&page_size=
       "file_type": "PDF",
       "file_size": 102400,
       "announcement_date": "2026-04-30T17:00:00",
+      "status": "active",
       "source": "auto",
       "is_visible": true,
       "download_url": "/api/announcements/550e8400.../download",
@@ -459,6 +468,39 @@ Server-Sent Events 端点，用于实时同步状态推送。Web UI 会自动连
   "max_interval": 3600
 }
 ```
+
+### 对账
+
+**`POST /api/sync/reconcile`**
+
+触发对账，检测公告状态变更（被取消、被取代、修订版）。
+
+**请求体：**
+
+| 字段          | 类型           | 默认值  | 说明                                               |
+|---------------|----------------|---------|----------------------------------------------------|
+| `stock_codes` | `list[string]` | 配置值  | 要对账的股票代码列表                                |
+| `date_from`   | `date`         | 自动    | 起始日期（默认为 days_back 天前）                   |
+| `date_to`     | `date`         | 今天    | 截止日期                                           |
+| `days_back`   | `int`          | `30`    | 未设置 date_from 时的回看天数                       |
+
+**请求示例：**
+
+```bash
+curl -X POST http://localhost:8000/api/sync/reconcile \
+  -H "Content-Type: application/json" \
+  -d '{"days_back": 30}'
+```
+
+**响应：**
+
+```json
+{
+  "task_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+}
+```
+
+通过 `GET /api/sync/status/{task_id}` 跟踪进度。
 
 ## 数据库表结构
 
@@ -617,6 +659,15 @@ SITE_URL=https://你的服务地址
 - 每次未发现新数据时，间隔翻倍
 - 上限为 `SCHEDULER_MAX_INTERVAL_SECONDS`（如 1 小时）
 - 发现新数据或手动触发同步时，重置为基础间隔
+
+### 对账
+
+通过重新检查港交所数据来检测被取消/取代的公告。
+
+| 变量                      | 默认值  | 说明                                       |
+|---------------------------|---------|--------------------------------------------|
+| `RECONCILE_ENABLED`       | `true`  | 启用同步后自动对账                         |
+| `RECONCILE_DAYS_BACK`     | `30`    | 回查天数，检查多少天内的状态变更           |
 
 ## 同步流程说明
 
