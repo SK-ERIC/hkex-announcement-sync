@@ -165,6 +165,7 @@ async def update_announcement_file(
     file_path: str,
     file_size: int,
     file_hash: str,
+    lang: str = "en",
 ) -> None:
     """
     Update the file storage metadata for an announcement.
@@ -177,13 +178,19 @@ async def update_announcement_file(
     file_path: Storage path of the downloaded file. / 下载文件的存储路径。
     file_size: File size in bytes. / 文件大小（字节）。
     file_hash: SHA-256 hash of the file. / 文件的 SHA-256 哈希值。
+    lang: Language of the file ('en' or 'zh'). / 文件语言。
 
     """
     announcement = await get_announcement_by_id(db, announcement_id)
     if announcement:
-        announcement.file_path_en = file_path
-        announcement.file_size = file_size
-        announcement.file_hash = file_hash
+        if lang == "en":
+            announcement.file_path_en = file_path
+            announcement.file_size_en = file_size
+            announcement.file_hash_en = file_hash
+        else:
+            announcement.file_path_zh = file_path
+            announcement.file_size_zh = file_size
+            announcement.file_hash_zh = file_hash
         announcement.last_synced_at = datetime.utcnow()
         await db.flush()
 

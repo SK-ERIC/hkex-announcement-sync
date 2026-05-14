@@ -57,8 +57,12 @@ def _get_lang_fields(ann: Announcement, language: LanguageEnum) -> dict:
 
     if suffix in ("zh", "cn"):
         hkex_url = ann.hkex_url_zh or ann.hkex_url_en or ""
+        file_size = ann.file_size_zh
+        file_hash = ann.file_hash_zh
     else:
         hkex_url = ann.hkex_url_en or ""
+        file_size = ann.file_size_en
+        file_hash = ann.file_hash_en
 
     return {
         "title": title,
@@ -67,6 +71,8 @@ def _get_lang_fields(ann: Announcement, language: LanguageEnum) -> dict:
         "short_text": short_text,
         "long_text": long_text,
         "hkex_url": hkex_url,
+        "file_size": file_size,
+        "file_hash": file_hash,
     }
 
 
@@ -129,7 +135,7 @@ async def list_announcements(
                 long_text=lang_fields["long_text"],
                 hkex_url=lang_fields["hkex_url"],
                 file_type=item.file_type,
-                file_size=item.file_size,
+                file_size=lang_fields["file_size"],
                 announcement_date=item.announcement_date,
                 source=item.source.value,
                 is_visible=item.is_visible,
@@ -188,13 +194,13 @@ async def get_announcement(
         long_text=lang_fields["long_text"],
         hkex_url=lang_fields["hkex_url"],
         file_type=announcement.file_type,
-        file_size=announcement.file_size,
+        file_size=lang_fields["file_size"],
         announcement_date=announcement.announcement_date,
         source=announcement.source.value,
         is_visible=announcement.is_visible,
         status=announcement.status,
         download_url=f"/api/announcements/{announcement.id}/download",
-        file_hash=announcement.file_hash,
+        file_hash=lang_fields["file_hash"],
         last_synced_at=announcement.last_synced_at,
         created_at=announcement.created_at,
         updated_at=announcement.updated_at,

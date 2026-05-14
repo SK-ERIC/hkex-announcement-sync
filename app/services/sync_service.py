@@ -250,10 +250,12 @@ class SyncService:
                     ann, lang_suffix = ann_map[dr.key]
                     if lang_suffix == "en":
                         ann.file_path_en = dr.file_path
+                        ann.file_size_en = dr.file_size
+                        ann.file_hash_en = dr.file_hash
                     else:
                         ann.file_path_zh = dr.file_path
-                    ann.file_size = dr.file_size
-                    ann.file_hash = dr.file_hash
+                        ann.file_size_zh = dr.file_size
+                        ann.file_hash_zh = dr.file_hash
                     ann.last_synced_at = datetime.utcnow()
 
             await self._db.commit()

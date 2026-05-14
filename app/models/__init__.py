@@ -132,6 +132,10 @@ class Announcement(Base):
     # Storage fields (for downloaded files)
     file_path_en: Mapped[str | None] = mapped_column(Text, nullable=True)
     file_path_zh: Mapped[str | None] = mapped_column(Text, nullable=True)
+    file_size_en: Mapped[int | None] = mapped_column(BIGINT, nullable=True)
+    file_size_zh: Mapped[int | None] = mapped_column(BIGINT, nullable=True)
+    file_hash_en: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    file_hash_zh: Mapped[str | None] = mapped_column(String(64), nullable=True)
     file_size: Mapped[int | None] = mapped_column(BIGINT, nullable=True)
     file_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
 

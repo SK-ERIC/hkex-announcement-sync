@@ -82,11 +82,12 @@ async def list_bulletins(
             bulletin_dt = ann.announcement_date.strftime("%Y-%m-%dT%H:%M:%S")
 
         file_size_str = ""
-        if ann.file_size:
-            if ann.file_size >= 1024 * 1024:
-                file_size_str = f"{ann.file_size / 1024 / 1024:.0f}MB"
+        lang_file_size = lang_fields.get("file_size")
+        if lang_file_size:
+            if lang_file_size >= 1024 * 1024:
+                file_size_str = f"{lang_file_size / 1024 / 1024:.0f}MB"
             else:
-                file_size_str = f"{ann.file_size / 1024:.0f}KB"
+                file_size_str = f"{lang_file_size / 1024:.0f}KB"
 
         bulletin_data.append(
             BulletinData(
