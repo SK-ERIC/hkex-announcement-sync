@@ -62,7 +62,7 @@ async def _run_sync_inline(
         start = datetime.utcnow()
 
         try:
-            result = await asyncio.to_thread(service.run)
+            result = await asyncio.to_thread(service.run, mode=mode)
             elapsed = (datetime.utcnow() - start).total_seconds()
 
             sync_log.status = SyncStatus.SUCCESS if not result.get("errors") else SyncStatus.FAILED
@@ -108,11 +108,13 @@ async def trigger_sync(request: SyncRequest):
     settings = get_settings()
     stock_codes_str = ",".join(request.stock_codes) if request.stock_codes else ",".join(settings.stock_codes)
 
-    # Prevent concurrent sync execution
+    # Prevent concurrent sync execution and reset scheduler backoff
     from app.services.scheduler import is_sync_running, reset_scheduler_interval
 
     if is_sync_running():
         raise HTTPException(status_code=409, detail="A sync task is already running")
+
+    reset_scheduler_interval()
 
     if settings.CELERY_ENABLED:
         from app.tasks.sync_tasks import sync_announcements_task
@@ -127,9 +129,6 @@ async def trigger_sync(request: SyncRequest):
 
     # Inline mode — create a SyncLog record and run in background
     from app.database import async_session_factory
-
-    # Reset scheduler interval after manual sync
-    reset_scheduler_interval()
 
     async with async_session_factory() as db:
         sync_log = SyncLog(

@@ -42,7 +42,7 @@ class SyncService:
         self._settings = settings or Settings()
         self._storage = create_storage_backend(self._settings)
 
-    def run(self, task_state: dict | None = None) -> dict[str, Any]:
+    def run(self, task_state: dict | None = None, mode: str = "incremental") -> dict[str, Any]:
         """
         Run the full sync pipeline for all configured stock codes.
 
@@ -51,6 +51,8 @@ class SyncService:
         Args:
         task_state: Optional dict for reporting progress to Celery task.
         用于向 Celery 任务报告进度的可选字典。
+        mode: Sync mode - 'incremental' or 'full'. / 同步模式。
+        incremental: sync from last sync date; full: sync from HKEX_FULL_HISTORY_START.
 
         Returns:
         dict[str, Any]: Summary with keys: total, synced, skipped, failed, errors.
@@ -66,7 +68,7 @@ class SyncService:
         with HKEXClient(self._settings) as client, PDFDownloader(self._storage, self._settings) as downloader:
             for stock_code in stock_codes:
                 try:
-                    s, k, f, e = self._sync_stock(client, downloader, stock_code, task_state)
+                    s, k, f, e = self._sync_stock(client, downloader, stock_code, task_state, mode=mode)
                     total_synced += s
                     total_skipped += k
                     total_failed += f
@@ -91,6 +93,7 @@ class SyncService:
         downloader: PDFDownloader,
         stock_code: str,
         task_state: dict | None,
+        mode: str = "incremental",
     ) -> tuple[int, int, int, list[str]]:
         """
         Sync a single stock code by running the async pipeline in a new event loop.
@@ -102,6 +105,7 @@ class SyncService:
         downloader: PDF downloader instance. / PDF 下载器实例。
         stock_code: The stock code to sync. / 要同步的股票代码。
         task_state: Optional progress tracking dict. / 可选的进度跟踪字典。
+        mode: Sync mode - 'incremental' or 'full'. / 同步模式。
 
         Returns:
         tuple[int, int, int, list[str]]: (synced, skipped, failed, errors) counts.
@@ -112,7 +116,7 @@ class SyncService:
 
         loop = asyncio.new_event_loop()
         try:
-            return loop.run_until_complete(self._sync_stock_async(client, downloader, stock_code, task_state))
+            return loop.run_until_complete(self._sync_stock_async(client, downloader, stock_code, task_state, mode=mode))
         finally:
             loop.close()
 
@@ -122,6 +126,7 @@ class SyncService:
         downloader: PDFDownloader,
         stock_code: str,
         task_state: dict | None,
+        mode: str = "incremental",
     ) -> tuple[int, int, int, list[str]]:
         """
         Async implementation of stock sync: resolve ID, fetch metadata, dedup, insert, download PDFs.
@@ -130,7 +135,7 @@ class SyncService:
 
         Steps / 步骤：
         1. Resolve stock ID from stock code. / 从股票代码解析股票 ID。
-        2. Determine incremental date range. / 确定增量日期范围。
+        2. Determine date range based on mode. / 根据模式确定日期范围。
         3. Fetch trilingual metadata from HKEX. / 从港交所获取三语元数据。
         4. Deduplicate by news_id. / 按 news_id 去重。
         5. Insert new records to database. / 将新记录插入数据库。
@@ -142,6 +147,7 @@ class SyncService:
         downloader: PDF downloader instance. / PDF 下载器实例。
         stock_code: The stock code to sync. / 要同步的股票代码。
         task_state: Optional progress tracking dict. / 可选的进度跟踪字典。
+        mode: Sync mode - 'incremental' syncs from last sync date; 'full' syncs from HKEX_FULL_HISTORY_START.
 
         Returns:
         tuple[int, int, int, list[str]]: (synced, skipped, failed, errors) counts.
@@ -151,12 +157,18 @@ class SyncService:
         # 1. Resolve stock ID
         stock_id = client.get_stock_id(stock_code)
 
-        # 2. Determine date range
-        last_sync = await announcement_service.get_last_sync_date(self._db, stock_code)
-        if last_sync:
-            date_from = last_sync.date() if hasattr(last_sync, "date") else last_sync
+        # 2. Determine date range based on mode
+        if mode == "full":
+            from datetime import datetime as dt
+
+            start_str = self._settings.HKEX_FULL_HISTORY_START
+            date_from = dt.strptime(start_str, "%Y-%m-%d").date()
         else:
-            date_from = date.today() - timedelta(days=90)
+            last_sync = await announcement_service.get_last_sync_date(self._db, stock_code)
+            if last_sync:
+                date_from = last_sync.date() if hasattr(last_sync, "date") else last_sync
+            else:
+                date_from = date.today() - timedelta(days=90)
         date_to = date.today()
 
         # 3. Fetch trilingual metadata from HKEX (EN + ZH + SC conversion)

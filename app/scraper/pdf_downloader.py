@@ -91,7 +91,7 @@ class PDFDownloader:
         """
         try:
             data = self._download_bytes(url)
-            file_hash = hashlib.md5(data).hexdigest()
+            file_hash = hashlib.sha256(data).hexdigest()
             file_path = self._storage.save(storage_key, data)
             return DownloadResult(
                 key=storage_key,

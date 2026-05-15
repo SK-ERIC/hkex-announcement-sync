@@ -42,7 +42,7 @@ def sync_announcements_task(
         async with async_session_factory() as db:
             task_state = {}
             service = SyncService(db, settings)
-            result = service.run(task_state)
+            result = service.run(task_state, mode=mode)
             return result
 
     loop = asyncio.new_event_loop()

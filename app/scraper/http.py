@@ -57,9 +57,11 @@ class RateLimiter:
             elapsed = now - self._last_request
             delay = max(0, self._min_interval - elapsed)
             jitter = random.uniform(0, self._jitter)
-            self._last_request = now + delay + jitter
-        if delay + jitter > 0:
-            time.sleep(delay + jitter)
+            total_delay = delay + jitter
+        if total_delay > 0:
+            time.sleep(total_delay)
+        with self._lock:
+            self._last_request = time.monotonic()
 
 
 def random_ua() -> str:
